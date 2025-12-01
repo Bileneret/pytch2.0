@@ -2,11 +2,11 @@ import os
 import sys
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QScrollArea, QFrame, QGridLayout, QWidget, QMessageBox
+    QScrollArea, QFrame, QWidget, QMessageBox
 )
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPixmap
-from src.models import EquipmentSlot, ItemType
+from src.models import EquipmentSlot
 
 
 def get_project_root():
@@ -18,12 +18,12 @@ class InventoryDialog(QDialog):
         super().__init__(parent)
         self.service = service
         self.setWindowTitle("Інвентар та Спорядження 🎒")
-        self.resize(800, 600)
+        self.resize(900, 600)
         self.setStyleSheet("background-color: white;")
 
         self.layout = QHBoxLayout(self)
 
-        # --- ЛІВА ЧАСТИНА: СПИСОК ПРЕДМЕТІВ (СУМКА) ---
+        # --- ЛІВА ЧАСТИНА: СУМКА ---
         self.left_panel = QWidget()
         self.left_layout = QVBoxLayout(self.left_panel)
 
@@ -41,19 +41,17 @@ class InventoryDialog(QDialog):
 
         self.left_layout.addWidget(self.scroll_area)
 
-        # --- ПРАВА ЧАСТИНА: СПОРЯДЖЕННЯ (ЛЯЛЬКА) ---
+        # --- ПРАВА ЧАСТИНА: СПОРЯДЖЕННЯ ---
         self.right_panel = QWidget()
         self.right_layout = QVBoxLayout(self.right_panel)
 
         self.right_layout.addWidget(
             QLabel("🛡️ СПОРЯДЖЕННЯ", styleSheet="font-weight: bold; font-size: 14px; color: #2c3e50;"))
 
-        # Створюємо віджети для кожного слота
         self.slots_container = QWidget()
         self.slots_layout = QVBoxLayout(self.slots_container)
 
         self.slot_widgets = {}
-        # Порядок відображення слотів
         display_order = [
             EquipmentSlot.HEAD,
             EquipmentSlot.BODY,
@@ -82,7 +80,7 @@ class InventoryDialog(QDialog):
             btn_unequip.setFixedWidth(60)
             btn_unequip.setStyleSheet(
                 "background-color: #e74c3c; color: white; border: none; border-radius: 3px; font-weight: bold;")
-            btn_unequip.hide()  # Ховаємо, якщо нічого не вдягнуто
+            btn_unequip.hide()
 
             hbox.addWidget(lbl_slot_name)
             hbox.addWidget(lbl_item_name)
@@ -91,7 +89,6 @@ class InventoryDialog(QDialog):
 
             self.slots_layout.addWidget(frame)
 
-            # Зберігаємо посилання на віджети, щоб оновлювати їх
             self.slot_widgets[slot] = {
                 'name_lbl': lbl_item_name,
                 'btn': btn_unequip,
@@ -101,31 +98,26 @@ class InventoryDialog(QDialog):
         self.right_layout.addWidget(self.slots_container)
         self.right_layout.addStretch()
 
-        # Відображення бонусів від спорядження
+        # Бонуси
         self.lbl_bonuses = QLabel("Бонуси: 0")
         self.lbl_bonuses.setStyleSheet(
             "color: #27ae60; font-weight: bold; border: 1px solid #27ae60; padding: 10px; border-radius: 5px;")
+        self.lbl_bonuses.setWordWrap(True)
         self.right_layout.addWidget(self.lbl_bonuses)
+
+        # DEBUG BUTTON
+        btn_debug_add = QPushButton("🎁 Отримати тестові речі")
+        btn_debug_add.setCursor(Qt.PointingHandCursor)
+        btn_debug_add.clicked.connect(self.add_test_items)
+        self.right_layout.addWidget(btn_debug_add)
 
         self.layout.addWidget(self.left_panel, stretch=3)
         self.layout.addWidget(self.right_panel, stretch=2)
 
         self.refresh_ui()
 
-        # DEBUG BUTTON
-        btn_debug_add = QPushButton("🎁 Отримати тестові речі")
-        btn_debug_add.clicked.connect(self.add_test_items)
-        self.right_layout.addWidget(btn_debug_add)
-
-        self.refresh_ui()
-
-    def add_test_items(self):
-        self.service.give_test_items()
-        self.refresh_ui()
-        QMessageBox.information(self, "Інвентар", "Предмети додано!")
-
     def refresh_ui(self):
-        """Оновлює списки предметів та слоти."""
+        """Оновлює інтерфейс."""
         # 1. Очищаємо список предметів
         while self.items_layout.count():
             child = self.items_layout.takeAt(0)
@@ -134,7 +126,6 @@ class InventoryDialog(QDialog):
         try:
             inventory = self.service.get_inventory()
 
-            # Розділяємо на вдягнуті та невдягнуті
             equipped_items = {item.item.slot: item for item in inventory if item.is_equipped}
             bag_items = [item for item in inventory if not item.is_equipped]
 
@@ -147,25 +138,34 @@ class InventoryDialog(QDialog):
                     self.create_item_card(inv_item)
 
             # --- Оновлюємо слоти ---
-            total_bonuses = {'str': 0, 'int': 0, 'dex': 0, 'vit': 0, 'def': 0}
+            total_bonuses = {'str': 0, 'int': 0, 'dex': 0, 'vit': 0, 'def': 0, 'base_dmg': 0}
 
             for slot, widgets in self.slot_widgets.items():
+                # Безпечне відключення сигналів
+                try:
+                    widgets['btn'].clicked.disconnect()
+                except TypeError:
+                    pass  # Якщо сигнал не був підключений - ігноруємо
+
                 if slot in equipped_items:
                     item = equipped_items[slot].item
                     widgets['name_lbl'].setText(f"{item.name}")
                     widgets['btn'].show()
-                    widgets['btn'].clicked.disconnect()  # Видаляємо старі підключення
+
+                    # Важливо: lambda має захоплювати ID
                     widgets['btn'].clicked.connect(
                         lambda checked, i_id=equipped_items[slot].id: self.unequip_item(i_id))
-                    widgets['frame'].setStyleSheet(
-                        "background-color: #d5f5e3; border-radius: 5px; border: 1px solid #2ecc71;")  # Зелений фон
 
-                    # Рахуємо бонуси для відображення
+                    widgets['frame'].setStyleSheet(
+                        "background-color: #d5f5e3; border-radius: 5px; border: 1px solid #2ecc71;")  # Зелений
+
+                    # Рахуємо бонуси
                     total_bonuses['str'] += item.bonus_str
                     total_bonuses['int'] += item.bonus_int
                     total_bonuses['dex'] += item.bonus_dex
                     total_bonuses['vit'] += item.bonus_vit
                     total_bonuses['def'] += item.bonus_def
+                    total_bonuses['base_dmg'] += item.base_dmg
                 else:
                     widgets['name_lbl'].setText("Пусто")
                     widgets['btn'].hide()
@@ -173,21 +173,23 @@ class InventoryDialog(QDialog):
                         "background-color: #ecf0f1; border-radius: 5px; border: 1px solid #bdc3c7;")
 
             # --- Оновлюємо текст бонусів ---
-            bonus_text = "БОНУСИ ВІД РЕЧЕЙ:\n"
-            if total_bonuses['str']: bonus_text += f"⚔️ Сила: +{total_bonuses['str']}  "
-            if total_bonuses['int']: bonus_text += f"🧠 Інтел: +{total_bonuses['int']}  "
-            if total_bonuses['dex']: bonus_text += f"🎯 Сприт: +{total_bonuses['dex']}  "
-            if total_bonuses['vit']: bonus_text += f"❤️ Здор: +{total_bonuses['vit']}  "
-            if total_bonuses['def']: bonus_text += f"🛡️ Захист: +{total_bonuses['def']}"
+            parts = []
+            if total_bonuses['str']: parts.append(f"⚔️STR+{total_bonuses['str']}")
+            if total_bonuses['int']: parts.append(f"🧠INT+{total_bonuses['int']}")
+            if total_bonuses['dex']: parts.append(f"🎯DEX+{total_bonuses['dex']}")
+            if total_bonuses['vit']: parts.append(f"❤️VIT+{total_bonuses['vit']}")
+            if total_bonuses['def']: parts.append(f"🛡️DEF+{total_bonuses['def']}")
+            if total_bonuses['base_dmg']: parts.append(f"💥DMG+{total_bonuses['base_dmg']}")
 
-            if bonus_text == "БОНУСИ ВІД РЕЧЕЙ:\n": bonus_text = "Немає активних бонусів"
+            bonus_text = "БОНУСИ: " + ", ".join(parts) if parts else "БОНУСИ: Немає"
             self.lbl_bonuses.setText(bonus_text)
 
         except Exception as e:
             print(f"Inventory Error: {e}")
+            import traceback
+            traceback.print_exc()  # Це покаже повний стек помилки в консолі
 
     def create_item_card(self, inv_item):
-        """Створює картку предмета в списку."""
         frame = QFrame()
         frame.setStyleSheet("background-color: white; border: 1px solid #bdc3c7; border-radius: 5px;")
         layout = QHBoxLayout(frame)
@@ -196,12 +198,15 @@ class InventoryDialog(QDialog):
         lbl_icon = QLabel("📦")
         if inv_item.item.image_path:
             base_path = get_project_root()
-            # Припускаємо, що іконки предметів лежать в assets/items/
-            # Якщо ні, можна використовувати assets/enemies як заглушку або створити папку
             img_path = os.path.join(base_path, "assets", "items", inv_item.item.image_path)
+            # Спробуємо і з папки enemies, якщо це заглушка
+            if not os.path.exists(img_path):
+                img_path = os.path.join(base_path, "assets", "enemies", inv_item.item.image_path)
+
             if os.path.exists(img_path):
                 pix = QPixmap(img_path).scaled(40, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 lbl_icon.setPixmap(pix)
+                lbl_icon.setText("")
 
         lbl_icon.setFixedSize(40, 40)
         lbl_icon.setAlignment(Qt.AlignCenter)
@@ -209,15 +214,15 @@ class InventoryDialog(QDialog):
 
         # Інфо
         info_layout = QVBoxLayout()
-        info_layout.addWidget(QLabel(inv_item.item.name, styleSheet="font-weight: bold; font-size: 12px;"))
+        info_layout.addWidget(
+            QLabel(inv_item.item.name, styleSheet="font-weight: bold; font-size: 12px; color: #2c3e50;"))
 
-        # Рядок характеристик предмета
         stats = []
         if inv_item.item.bonus_str: stats.append(f"STR+{inv_item.item.bonus_str}")
         if inv_item.item.bonus_int: stats.append(f"INT+{inv_item.item.bonus_int}")
         if inv_item.item.bonus_def: stats.append(f"DEF+{inv_item.item.bonus_def}")
-        if inv_item.item.bonus_dex: stats.append(f"DEX+{inv_item.item.bonus_dex}")
-        stats_str = ", ".join(stats) if stats else "Звичайний предмет"
+        if inv_item.item.base_dmg: stats.append(f"DMG+{inv_item.item.base_dmg}")
+        stats_str = ", ".join(stats) if stats else "Звичайний"
 
         info_layout.addWidget(
             QLabel(f"{inv_item.item.item_type.value} | {stats_str}", styleSheet="color: gray; font-size: 10px;"))
@@ -226,7 +231,7 @@ class InventoryDialog(QDialog):
         layout.addStretch()
 
         # Кнопка "Вдягнути"
-        if inv_item.item.slot:  # Якщо предмет можна вдягнути
+        if inv_item.item.slot:
             btn_equip = QPushButton("Вдягнути")
             btn_equip.setCursor(Qt.PointingHandCursor)
             btn_equip.setStyleSheet(
@@ -249,3 +254,8 @@ class InventoryDialog(QDialog):
             self.refresh_ui()
         except Exception as e:
             QMessageBox.warning(self, "Помилка", str(e))
+
+    def add_test_items(self):
+        self.service.give_test_items()
+        self.refresh_ui()
+        QMessageBox.information(self, "Інвентар", "Тестові предмети додано!")
