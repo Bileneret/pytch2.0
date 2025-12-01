@@ -11,6 +11,7 @@ from src.ui.dialogs import AddGoalDialog
 from src.ui.longterm_dialog import AddLongTermDialog
 from src.ui.stats_dialog import StatsDialog
 from src.ui.inventory_dialog import InventoryDialog  # <--- НОВИЙ ІМПОРТ
+from src.ui.shop_dialog import ShopDialog
 
 # Імпорт панелей
 from src.ui.hero_panel import HeroPanel
@@ -93,6 +94,13 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.tab_longterm, "📅 Звички")
 
         self.root_layout.addWidget(self.tabs)
+
+        self.middle_panel.shop_clicked.connect(self.open_shop)  # <--- Підключення
+
+    def open_shop(self):
+        """Відкриває магазин."""
+        ShopDialog(self, self.service).exec_()
+        self.refresh_data()  # Оновлюємо золото після покупок
 
     def create_tab_controls(self, layout, btn_text, btn_command):
         box = QHBoxLayout()
