@@ -156,11 +156,30 @@ class MainWindow(QMainWindow):
             print(f"Error checking deadlines: {e}")
 
     def refresh_data(self):
+        # --- ЗАПОБІЖНИК ВІД ПОМИЛОК ОНОВЛЕННЯ ---
         try:
+            # Панелі
+            try:
+                hero = self.service.get_hero()
+                enemy = self.service.get_current_enemy()
+                simulated_now = datetime.now() + self.time_offset
+
+                self.hero_panel.update_data(hero)
+                self.middle_panel.update_data(hero, simulated_now)
+                self.enemy_widget.update_enemy(enemy)
+            except ValueError:
+                pass  # Ігноруємо, якщо немає сесії
+
+            # Списки
+            self.update_quest_list()
+            self.update_habit_list()
             hero = self.service.get_hero()
             enemy = self.service.get_current_enemy()
             simulated_now = datetime.now() + self.time_offset
 
+        except Exception as e:
+            print(f"Refresh Error: {e}")
+            # Не показуємо вікно, щоб не спамити, але пишемо в консоль
             self.hero_panel.update_data(hero)
             self.middle_panel.update_data(hero, simulated_now)
             self.enemy_widget.update_enemy(enemy)
