@@ -8,6 +8,7 @@ from .combat_logic import CombatLogic
 from .quest_logic import QuestLogic
 from .habit_logic import HabitLogic
 from .item_logic import ItemLogic
+from .shop_logic import ShopLogic
 
 class ValidationUtils:
     """

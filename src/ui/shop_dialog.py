@@ -17,7 +17,7 @@ class ShopDialog(QDialog):
         super().__init__(parent)
         self.service = service
         self.setWindowTitle("Магазин 🛒")
-        self.resize(800, 600)
+        self.resize(900, 900)
         self.setStyleSheet("background-color: white;")
 
         layout = QVBoxLayout(self)
@@ -76,7 +76,7 @@ class ShopDialog(QDialog):
 
     def create_item_card(self, item):
         frame = QFrame()
-        frame.setFixedSize(180, 220)
+        frame.setFixedSize(200, 250)
         frame.setStyleSheet("""
             QFrame { background-color: white; border: 1px solid #bdc3c7; border-radius: 8px; }
             QFrame:hover { border: 2px solid #3498db; }

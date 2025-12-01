@@ -60,3 +60,7 @@ class ItemLogic:
                 bonuses['double_attack_chance'] += item.double_attack_chance
 
         return bonuses
+
+    def get_all_library_items(self) -> List[Item]:
+        """Повертає всі існуючі в грі предмети."""
+        return self.storage.get_all_library_items()

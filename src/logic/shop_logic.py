@@ -9,8 +9,6 @@ class ShopLogic:
         """Купує предмет з бібліотеки за ID."""
         hero = self.get_hero()
 
-        # Знаходимо предмет в бібліотеці (потрібен метод в storage або ми отримаємо його зі списку)
-        # Оскільки get_all_library_items повертає список, знайдемо в ньому
         all_items = self.storage.get_all_library_items()
         target_item = next((i for i in all_items if i.id == item_id), None)
 

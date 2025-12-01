@@ -1,3 +1,5 @@
+import os
+import sys
 from datetime import datetime, timedelta
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -10,7 +12,7 @@ from src.models import Goal, Difficulty, LongTermGoal
 from src.ui.dialogs import AddGoalDialog
 from src.ui.longterm_dialog import AddLongTermDialog
 from src.ui.stats_dialog import StatsDialog
-from src.ui.inventory_dialog import InventoryDialog  # <--- НОВИЙ ІМПОРТ
+from src.ui.inventory_dialog import InventoryDialog
 from src.ui.shop_dialog import ShopDialog
 
 # Імпорт панелей
@@ -59,9 +61,9 @@ class MainWindow(QMainWindow):
         top_layout.addWidget(self.hero_panel)
 
         self.middle_panel = MiddlePanel()
-        # Підключення сигналів
         self.middle_panel.stats_clicked.connect(self.open_stats_dialog)
-        self.middle_panel.inventory_clicked.connect(self.open_inventory)  # <--- НОВЕ ПІДКЛЮЧЕННЯ
+        self.middle_panel.inventory_clicked.connect(self.open_inventory)
+        self.middle_panel.shop_clicked.connect(self.open_shop)
         self.middle_panel.logout_clicked.connect(self.on_logout)
         self.middle_panel.debug_time_clicked.connect(self.on_debug_add_time)
         top_layout.addWidget(self.middle_panel)
@@ -71,7 +73,7 @@ class MainWindow(QMainWindow):
 
         self.root_layout.addWidget(top_container)
 
-        # 2. НИЖНЯ СЕКЦІЯ (Таби)
+        # 2. НИЖНЯ СЕКЦІЯ
         self.tabs = QTabWidget()
         self.tabs.setStyleSheet("""
             QTabWidget::pane { border: 0; }
@@ -94,13 +96,6 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.tab_longterm, "📅 Звички")
 
         self.root_layout.addWidget(self.tabs)
-
-        self.middle_panel.shop_clicked.connect(self.open_shop)  # <--- Підключення
-
-    def open_shop(self):
-        """Відкриває магазин."""
-        ShopDialog(self, self.service).exec_()
-        self.refresh_data()  # Оновлюємо золото після покупок
 
     def create_tab_controls(self, layout, btn_text, btn_command):
         box = QHBoxLayout()
@@ -164,30 +159,11 @@ class MainWindow(QMainWindow):
             print(f"Error checking deadlines: {e}")
 
     def refresh_data(self):
-        # --- ЗАПОБІЖНИК ВІД ПОМИЛОК ОНОВЛЕННЯ ---
         try:
-            # Панелі
-            try:
-                hero = self.service.get_hero()
-                enemy = self.service.get_current_enemy()
-                simulated_now = datetime.now() + self.time_offset
-
-                self.hero_panel.update_data(hero)
-                self.middle_panel.update_data(hero, simulated_now)
-                self.enemy_widget.update_enemy(enemy)
-            except ValueError:
-                pass  # Ігноруємо, якщо немає сесії
-
-            # Списки
-            self.update_quest_list()
-            self.update_habit_list()
             hero = self.service.get_hero()
             enemy = self.service.get_current_enemy()
             simulated_now = datetime.now() + self.time_offset
 
-        except Exception as e:
-            print(f"Refresh Error: {e}")
-            # Не показуємо вікно, щоб не спамити, але пишемо в консоль
             self.hero_panel.update_data(hero)
             self.middle_panel.update_data(hero, simulated_now)
             self.enemy_widget.update_enemy(enemy)
@@ -215,7 +191,7 @@ class MainWindow(QMainWindow):
                     card = QuestCard(g, self.complete_goal, self.delete_goal)
                     self.quest_list_layout.addWidget(card)
         except Exception as e:
-            self.quest_list_layout.addWidget(QLabel(f"Помилка завантаження: {e}", styleSheet="color: red;"))
+            self.quest_list_layout.addWidget(QLabel(f"Помилка: {e}", styleSheet="color: red;"))
 
     def update_habit_list(self):
         while self.longterm_list_layout.count():
@@ -235,7 +211,7 @@ class MainWindow(QMainWindow):
                     card = HabitCard(g, simulated_now, self.start_habit, self.finish_habit)
                     self.longterm_list_layout.addWidget(card)
         except Exception as e:
-            self.longterm_list_layout.addWidget(QLabel(f"Помилка завантаження: {e}", styleSheet="color: red;"))
+            self.longterm_list_layout.addWidget(QLabel(f"Помилка: {e}", styleSheet="color: red;"))
 
     # --- ACTIONS ---
     def on_add_goal(self):
@@ -287,12 +263,20 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Помилка", f"Не вдалося відкрити характеристики:\n{str(e)}")
 
     def open_inventory(self):
-        """Відкриває інвентар."""
         try:
             InventoryDialog(self, self.service).exec_()
-            self.refresh_data()  # Оновлюємо, бо могли вдягнути речі і змінити стати
+            self.refresh_data()
         except Exception as e:
             QMessageBox.critical(self, "Помилка", f"Не вдалося відкрити інвентар:\n{str(e)}")
+
+    def open_shop(self):
+        """Відкриває магазин."""
+        try:
+            ShopDialog(self, self.service).exec_()
+            self.refresh_data()  # Оновлюємо золото після покупок
+        except Exception as e:
+            QMessageBox.critical(self, "Помилка", f"Не вдалося відкрити магазин:\n{str(e)}")
+            print(f"Shop Crash Details: {e}")
 
     def on_logout(self):
         reply = QMessageBox.question(self, 'Вихід', "Вийти з акаунту?", QMessageBox.Yes | QMessageBox.No)
