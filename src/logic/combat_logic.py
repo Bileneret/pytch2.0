@@ -17,11 +17,9 @@ class CombatLogic:
 
     def _get_total_stats(self, hero):
         """
-        Повертає реальні характеристики (База + Бонуси від речей).
-        Повертає словник.
+        Повертає реальні характеристики (База + Бонуси від речей),
+        включаючи Шанс Подвійної Атаки.
         """
-        # Цей метод (calculate_equipment_bonuses) прийде з ItemLogic,
-        # тому важливо, щоб GoalService успадковував і ItemLogic теж.
         bonuses = self.calculate_equipment_bonuses()
 
         return {
@@ -29,18 +27,20 @@ class CombatLogic:
             'int': hero.int_stat + bonuses['int'],
             'dex': hero.dex_stat + bonuses['dex'],
             'vit': hero.vit_stat + bonuses['vit'],
-            'def': hero.def_stat + bonuses['def']
+            'def': hero.def_stat + bonuses['def'],
+            # Передаємо шанс далі
+            'double_attack_chance': bonuses['double_attack_chance']
         }
 
     def calculate_hero_damage(self, hero) -> Tuple[int, int]:
         """
         Повертає (фіз. урон, маг. урон).
-        Враховує бонуси від спорядження.
         """
         stats = self._get_total_stats(hero)
+        bonuses = self.calculate_equipment_bonuses()
 
-        # Формула: База + (Сила * 2)
-        bonus_phys = stats['str'] * 2
+        # Формула: База + (Сила * 2) + Бонус Зброї
+        bonus_phys = (stats['str'] * 2) + bonuses['base_dmg']
         # Формула: (Інтелект * 2)
         bonus_magic = stats['int'] * 2
 
@@ -50,18 +50,11 @@ class CombatLogic:
         return total_phys, total_magic
 
     def take_damage(self, hero, enemy) -> int:
-        """
-        Розрахунок отримання урону.
-        Враховує бонуси захисту та спритності.
-        """
         stats = self._get_total_stats(hero)
-
-        # 1. Ухилення (Спритність)
         dodge_chance = stats['dex'] * 1.0
         if random.uniform(0, 100) < dodge_chance:
-            return 0  # Ухилився!
+            return 0
 
-        # 2. Зменшення урону (Захист)
         reduction = stats['def'] * 2
         final_damage = max(1, enemy.damage - reduction)
 
@@ -73,27 +66,46 @@ class CombatLogic:
         hero = self.get_hero()
         enemy = self.get_current_enemy()
 
+        # Якщо урон не передано явно (авто-атака), рахуємо його
         if phys_dmg == 0 and magic_dmg == 0:
             phys_dmg, magic_dmg = self.calculate_hero_damage(hero)
 
+        # 1. Основна атака
         total_dmg = phys_dmg + magic_dmg
         enemy.current_hp -= total_dmg
 
         msg = f"Ви нанесли {total_dmg} урону (⚔️{phys_dmg} + ✨{magic_dmg}) по {enemy.name}!"
+
+        # 2. Перевірка на ПОДВІЙНУ АТАКУ
+        stats = self._get_total_stats(hero)
+        dbl_chance = stats['double_attack_chance']
+
+        if dbl_chance > 0:
+            # Кидаємо кубик (1-100)
+            roll = random.randint(1, 100)
+            if roll <= dbl_chance:
+                # Успіх! Рахуємо 50% від поточної атаки
+                second_phys = int(phys_dmg * 0.5)
+                second_magic = int(magic_dmg * 0.5)
+                second_total = second_phys + second_magic
+
+                # Наносимо додатковий урон
+                enemy.current_hp -= second_total
+
+                msg += f"\n⚡ ПОДВІЙНА АТАКА! (Шанс {dbl_chance}%)"
+                msg += f"\n   Додатково: {second_total} урону (⚔️{second_phys} + ✨{second_magic})"
+
         is_dead = False
         loot_info = None
 
         if enemy.current_hp <= 0:
             is_dead = True
-
             hero.current_xp += enemy.reward_xp
             hero.gold += enemy.reward_gold
             loot_info = f"Отримано: {enemy.reward_xp} XP, {enemy.reward_gold} монет."
 
             if random.random() < enemy.drop_chance:
                 loot_info += "\n🎁 Випав предмет спорядження! (В розробці)"
-                # Тут можна буде додати логіку видачі рандомного предмета
-                # self.give_random_loot()
 
             msg = f"{msg}\n💀 {enemy.name} переможено!\n{loot_info}"
 

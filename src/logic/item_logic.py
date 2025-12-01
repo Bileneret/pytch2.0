@@ -36,8 +36,15 @@ class ItemLogic:
         return [i for i in inventory if i.is_equipped]
 
     def calculate_equipment_bonuses(self):
+        """Розрахунок всіх бонусів від спорядження."""
         equipped = self.get_equipped_items()
-        bonuses = {'str': 0, 'int': 0, 'dex': 0, 'vit': 0, 'def': 0, 'base_dmg': 0}
+
+        # ⚠️ ТУТ БУЛА ПОМИЛКА: Ми додали ключ 'double_attack_chance'
+        bonuses = {
+            'str': 0, 'int': 0, 'dex': 0, 'vit': 0, 'def': 0,
+            'base_dmg': 0,
+            'double_attack_chance': 0
+        }
 
         for inv_item in equipped:
             item = inv_item.item
@@ -47,5 +54,9 @@ class ItemLogic:
             bonuses['vit'] += item.bonus_vit
             bonuses['def'] += item.bonus_def
             bonuses['base_dmg'] += item.base_dmg
+
+            # Додаємо шанс, якщо атрибут існує у предмета (безпечна перевірка)
+            if hasattr(item, 'double_attack_chance'):
+                bonuses['double_attack_chance'] += item.double_attack_chance
 
         return bonuses

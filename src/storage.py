@@ -2,7 +2,7 @@ import sqlite3
 import uuid
 import os
 import sys
-import re  # <--- Потрібно для розбору назви файлу
+import re
 from datetime import datetime
 from typing import List, Optional
 from .models import (
@@ -20,7 +20,6 @@ class StorageService:
     def __init__(self, db_path: str):
         self.db_path = db_path
         self.init_db()
-        # Тепер seed_items сканує папку
         self.seed_items_from_folder()
 
     def _get_connection(self):
@@ -59,7 +58,7 @@ class StorageService:
             )
         """)
 
-        # Goals & Subgoals
+        # Goals etc... (без змін)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS goals (
                 id TEXT PRIMARY KEY, hero_id TEXT NOT NULL, title TEXT NOT NULL, description TEXT, deadline TEXT, difficulty INTEGER, created_at TEXT, is_completed INTEGER DEFAULT 0, penalty_applied INTEGER DEFAULT 0, FOREIGN KEY (hero_id) REFERENCES heroes (id) ON DELETE CASCADE)
@@ -67,11 +66,11 @@ class StorageService:
         cursor.execute(
             "CREATE TABLE IF NOT EXISTS sub_goals (id TEXT PRIMARY KEY, goal_id TEXT NOT NULL, title TEXT NOT NULL, is_completed INTEGER DEFAULT 0, FOREIGN KEY (goal_id) REFERENCES goals (id) ON DELETE CASCADE)")
         cursor.execute(
-            "CREATE TABLE IF NOT EXISTS long_term_goals (id TEXT PRIMARY KEY, hero_id TEXT NOT NULL, title TEXT NOT NULL, description TEXT, total_days INTEGER, start_date TEXT, time_frame TEXT, current_day INTEGER DEFAULT 1, checked_days INTEGER DEFAULT 0, missed_days INTEGER DEFAULT 0, is_completed INTEGER DEFAULT 0, daily_state TEXT DEFAULT 'pending', last_update_date TEXT, FOREIGN KEY (hero_id) REFERENCES heroes (id) ON DELETE CASCADE)")
+            "CREATE TABLE IF NOT EXISTS long_term_goals (id TEXT PRIMARY KEY, hero_id TEXT NOT NULL, title TEXT NOT NULL, description TEXT, total_days INTEGER, start_date TEXT, time_frame TEXT, current_day INTEGER DEFAULT 1, checked_days INTEGER DEFAULT 0, missed_days INTEGER DEFAULT 0, is_completed INTEGER DEFAULT 0, daily_state TEXT DEFAULT 'pending', last_update_date TEXT, last_checkin TEXT, FOREIGN KEY (hero_id) REFERENCES heroes (id) ON DELETE CASCADE)")
         cursor.execute(
             "CREATE TABLE IF NOT EXISTS current_enemies (hero_id TEXT PRIMARY KEY, id TEXT NOT NULL, name TEXT, rarity TEXT, level INTEGER, current_hp INTEGER, max_hp INTEGER, damage INTEGER, damage_type TEXT, reward_xp INTEGER, reward_gold INTEGER, drop_chance REAL, image_path TEXT, FOREIGN KEY (hero_id) REFERENCES heroes (id) ON DELETE CASCADE)")
 
-        # Items Library
+        # Items Library - ОНОВЛЕНО
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS items_library (
                 id TEXT PRIMARY KEY,
@@ -87,13 +86,13 @@ class StorageService:
                 bonus_vit INTEGER DEFAULT 0,
                 bonus_def INTEGER DEFAULT 0,
                 base_dmg INTEGER DEFAULT 0,
+                double_attack_chance INTEGER DEFAULT 0, -- <--- НОВЕ ПОЛЕ
                 price INTEGER DEFAULT 0,
                 level INTEGER DEFAULT 1,
-                image_path TEXT UNIQUE -- Щоб не дублювати при кожному запуску
+                image_path TEXT UNIQUE
             )
         """)
 
-        # Inventory
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS inventory (
                 id TEXT PRIMARY KEY,
@@ -108,122 +107,112 @@ class StorageService:
         conn.commit()
         conn.close()
 
-    # --- АВТОМАТИЧНИЙ ІМПОРТ ПРЕДМЕТІВ ---
     def seed_items_from_folder(self):
-        """
-        Сканує папку assets/items.
-        Парсить файли формату: Назва_Предмета_STR_INT_DEX_VIT_DEF.png
-        """
         base_path = get_project_root()
         items_path = os.path.join(base_path, "assets", "items")
 
-        if not os.path.exists(items_path):
-            # Якщо папки немає - створюємо, щоб не було помилки, але нічого не додаємо
-            try:
-                os.makedirs(items_path)
-            except:
-                pass
-            return
+        if not os.path.exists(items_path): return
 
         files = os.listdir(items_path)
         conn = self._get_connection()
         cursor = conn.cursor()
 
-        # Регулярний вираз: (Будь-яка назва)_(STR)_(INT)_(DEX)_(VIT)_(DEF).png
-        # Приклад: Дерев'яний_Меч_5_4_2_1_2.png
-        pattern = re.compile(r"^(.*)_(\d+)_(\d+)_(\d+)_(\d+)_(\d+)\.png$", re.IGNORECASE)
+        # Паттерн 1: Стандартний (6 чисел)
+        # Назва_STR_INT_DEX_VIT_DEF.png (наприклад, для броні)
+        pattern_std = re.compile(r"^(.*)_(\d+)_(\d+)_(\d+)_(\d+)_(\d+)\.png$", re.IGNORECASE)
+
+        # Паттерн 2: Розширений (7 чисел - з шансом подвійної атаки)
+        # Назва_STR_INT_DEX_VIT_DEF_DOUBLE.png
+        pattern_adv = re.compile(r"^(.*)_(\d+)_(\d+)_(\d+)_(\d+)_(\d+)_(\d+)\.png$", re.IGNORECASE)
 
         count_added = 0
 
         for filename in files:
-            match = pattern.match(filename)
-            if match:
-                raw_name = match.group(1)
-                str_val = int(match.group(2))
-                int_val = int(match.group(3))
-                dex_val = int(match.group(4))
-                vit_val = int(match.group(5))
-                def_val = int(match.group(6))
+            # Спробуємо розширений патерн (для кинджалів)
+            match_adv = pattern_adv.match(filename)
+            match_std = pattern_std.match(filename)
 
-                # Чистимо назву: "Дерев'яний_Меч" -> "Дерев'яний Меч"
-                clean_name = raw_name.replace("_", " ")
+            if match_adv:
+                raw_name = match_adv.group(1)
+                str_val = int(match_adv.group(2))
+                int_val = int(match_adv.group(3))
+                dex_val = int(match_adv.group(4))
+                vit_val = int(match_adv.group(5))
+                def_val = int(match_adv.group(6))
+                double_chance = int(match_adv.group(7))  # Ось наш %
+            elif match_std:
+                raw_name = match_std.group(1)
+                str_val = int(match_std.group(2))
+                int_val = int(match_std.group(3))
+                dex_val = int(match_std.group(4))
+                vit_val = int(match_std.group(5))
+                def_val = int(match_std.group(6))
+                double_chance = 0  # Немає
+            else:
+                continue  # Файл не підходить
 
-                # Авто-визначення типу та слоту за назвою
-                item_type, slot, w_class = self._guess_item_type_and_slot(clean_name)
+            clean_name = raw_name.replace("_", " ")
+            item_type, slot, w_class = self._guess_item_type_and_slot(clean_name)
 
-                # Розрахунок ціни (базова формула від статів)
-                total_stats = str_val + int_val + dex_val + vit_val + def_val
-                price = total_stats * 10 + 5
+            total_stats = str_val + int_val + dex_val + vit_val + def_val + double_chance
+            price = total_stats * 10 + 5
 
-                # Базовий урон (для зброї беремо Силу або Інтелект як базу, або фіксовано)
-                base_dmg = 0
-                if item_type == ItemType.WEAPON:
-                    base_dmg = max(str_val, int_val)  # Спрощено
+            base_dmg = 0
+            if item_type == ItemType.WEAPON:
+                base_dmg = max(str_val, int_val)
 
-                # Спробуємо додати в БД (IGNORE, якщо такий файл вже є)
-                try:
-                    item_id = str(uuid.uuid4())
-                    cursor.execute("""
-                        INSERT OR IGNORE INTO items_library (
-                            id, name, item_type, slot, weapon_class, weapon_hands, damage_type,
-                            bonus_str, bonus_int, bonus_dex, bonus_vit, bonus_def, base_dmg,
-                            price, level, image_path
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (
-                        item_id, clean_name, item_type.value, slot.value,
-                        w_class.value, WeaponHandType.ONE_HANDED.value, DamageType.PHYSICAL.value,
-                        str_val, int_val, dex_val, vit_val, def_val, base_dmg,
-                        price, 1, filename
-                    ))
-                    if cursor.rowcount > 0:
-                        count_added += 1
-                except Exception as e:
-                    print(f"Error adding item {filename}: {e}")
+            try:
+                item_id = str(uuid.uuid4())
+                cursor.execute("""
+                    INSERT OR IGNORE INTO items_library (
+                        id, name, item_type, slot, weapon_class, weapon_hands, damage_type,
+                        bonus_str, bonus_int, bonus_dex, bonus_vit, bonus_def, base_dmg,
+                        double_attack_chance, price, level, image_path
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    item_id, clean_name, item_type.value, slot.value,
+                    w_class.value, WeaponHandType.ONE_HANDED.value, DamageType.PHYSICAL.value,
+                    str_val, int_val, dex_val, vit_val, def_val, base_dmg,
+                    double_chance, price, 1, filename
+                ))
+                if cursor.rowcount > 0:
+                    count_added += 1
+            except Exception as e:
+                print(f"Error adding item {filename}: {e}")
 
         conn.commit()
         conn.close()
         if count_added > 0:
-            print(f"Успішно імпортовано {count_added} нових предметів з папки!")
+            print(f"Успішно імпортовано {count_added} нових предметів!")
 
     def _guess_item_type_and_slot(self, name: str):
-        """Евристика для визначення типу предмета за назвою."""
         name_lower = name.lower()
+        if any(x in name_lower for x in
+               ["меч", "sword", "клинок"]): return ItemType.WEAPON, EquipmentSlot.MAIN_HAND, WeaponClass.SWORD
+        if any(x in name_lower for x in
+               ["лук", "bow", "арбалет"]): return ItemType.WEAPON, EquipmentSlot.MAIN_HAND, WeaponClass.BOW
+        if any(x in name_lower for x in
+               ["посох", "staff", "палиця"]): return ItemType.WEAPON, EquipmentSlot.MAIN_HAND, WeaponClass.STAFF
+        if any(x in name_lower for x in ["кинджал", "кинджали", "ніж", "dagger",
+                                         "knife"]): return ItemType.WEAPON, EquipmentSlot.MAIN_HAND, WeaponClass.DAGGER
+        if any(x in name_lower for x in
+               ["щит", "shield"]): return ItemType.WEAPON, EquipmentSlot.OFF_HAND, WeaponClass.SHIELD
 
-        # ЗБРОЯ
-        if any(x in name_lower for x in ["меч", "sword", "клинок"]):
-            return ItemType.WEAPON, EquipmentSlot.MAIN_HAND, WeaponClass.SWORD
-        if any(x in name_lower for x in ["лук", "bow", "арбалет"]):
-            return ItemType.WEAPON, EquipmentSlot.MAIN_HAND, WeaponClass.BOW
-        if any(x in name_lower for x in ["посох", "staff", "палиця"]):
-            return ItemType.WEAPON, EquipmentSlot.MAIN_HAND, WeaponClass.STAFF
-        if any(x in name_lower for x in ["кинджал", "кинджали", "ніж", "dagger", "knife"]):
-            return ItemType.WEAPON, EquipmentSlot.MAIN_HAND, WeaponClass.DAGGER
-        if any(x in name_lower for x in ["щит", "shield"]):
-            return ItemType.WEAPON, EquipmentSlot.OFF_HAND, WeaponClass.SHIELD
+        if any(x in name_lower for x in
+               ["шолом", "капелюх", "шлем", "helmet"]): return ItemType.ARMOR, EquipmentSlot.HEAD, WeaponClass.NONE
+        if any(x in name_lower for x in ["обладунок", "тіло", "куртка", "armor", "chest",
+                                         "body"]): return ItemType.ARMOR, EquipmentSlot.BODY, WeaponClass.NONE
+        if any(x in name_lower for x in
+               ["штани", "поножі", "legs", "pants"]): return ItemType.ARMOR, EquipmentSlot.LEGS, WeaponClass.NONE
+        if any(x in name_lower for x in ["взуття", "черевики", "чоботи", "boots",
+                                         "shoes"]): return ItemType.ARMOR, EquipmentSlot.FEET, WeaponClass.NONE
+        if any(x in name_lower for x in ["рукавиці", "перчатки", "hands",
+                                         "gloves"]): return ItemType.ARMOR, EquipmentSlot.HANDS, WeaponClass.NONE
 
-        # БРОНЯ
-        if any(x in name_lower for x in ["шолом", "капелюх", "шлем", "helmet", "hat", "hood"]):
-            return ItemType.ARMOR, EquipmentSlot.HEAD, WeaponClass.NONE
-        if any(x in name_lower for x in ["обладунок", "тіло", "куртка", "сорочка", "armor", "chest", "body", "shirt"]):
-            return ItemType.ARMOR, EquipmentSlot.BODY, WeaponClass.NONE
-        if any(x in name_lower for x in ["штани", "поножі", "legs", "pants"]):
-            return ItemType.ARMOR, EquipmentSlot.LEGS, WeaponClass.NONE
-        if any(x in name_lower for x in ["взуття", "черевики", "чоботи", "boots", "shoes", "feets"]):
-            return ItemType.ARMOR, EquipmentSlot.FEET, WeaponClass.NONE
-        if any(x in name_lower for x in ["рукавиці", "перчатки", "hands", "gloves"]):
-            return ItemType.ARMOR, EquipmentSlot.HANDS, WeaponClass.NONE
-
-        # Дефолт (якщо не вгадали - нехай буде просто мотлох або зброя)
         return ItemType.WEAPON, EquipmentSlot.MAIN_HAND, WeaponClass.NONE
 
-    # --- Inventory (Без змін) ---
-    def add_item_to_inventory(self, hero_id: str, item: Item):
-        conn = self._get_connection()
-        inv_id = uuid.uuid4()
-        conn.execute("INSERT INTO inventory (id, hero_id, item_id, is_equipped) VALUES (?, ?, ?, 0)",
-                     (str(inv_id), hero_id, str(item.id)))
-        conn.commit()
-        conn.close()
+    # ... Інші методи (create_hero, update_hero, save_goal) залишаються без змін ...
+    # (Я скорочую, щоб не спамити, але переконайся, що get_inventory теж оновлено нижче)
 
     def get_inventory(self, hero_id: str) -> List[InventoryItem]:
         conn = self._get_connection()
@@ -239,6 +228,7 @@ class StorageService:
 
         inventory = []
         for row in rows:
+            # row structure: 0=inv_id, 1=equipped, 2=lib_id, 3=name, 4=type, 5=slot, ...
             item_type = next((t for t in ItemType if t.value == row[4]), None)
             slot = next((s for s in EquipmentSlot if s.value == row[5]), None)
             w_class = next((w for w in WeaponClass if w.value == row[6]), WeaponClass.NONE)
@@ -249,10 +239,21 @@ class StorageService:
                 id=uuid.UUID(row[2]), name=row[3], item_type=item_type, slot=slot,
                 weapon_class=w_class, weapon_hands=w_hand, damage_type=dmg_type,
                 bonus_str=row[9], bonus_int=row[10], bonus_dex=row[11], bonus_vit=row[12], bonus_def=row[13],
-                base_dmg=row[14], price=row[15], level=row[16], image_path=row[17]
+                base_dmg=row[14],
+                double_attack_chance=row[15],  # <--- Зчитуємо шанс
+                price=row[16], level=row[17], image_path=row[18]
             )
             inventory.append(InventoryItem(item=item, is_equipped=bool(row[1]), id=uuid.UUID(row[0])))
         return inventory
+
+    # ... equip_item, unequip_item, get_all_library_items оновлюються аналогічно (додається поле) ...
+    def add_item_to_inventory(self, hero_id: str, item: Item):
+        conn = self._get_connection()
+        inv_id = uuid.uuid4()
+        conn.execute("INSERT INTO inventory (id, hero_id, item_id, is_equipped) VALUES (?, ?, ?, 0)",
+                     (str(inv_id), hero_id, str(item.id)))
+        conn.commit()
+        conn.close()
 
     def equip_item(self, hero_id: str, inventory_id: uuid.UUID, slot_value: str):
         conn = self._get_connection()
@@ -288,15 +289,20 @@ class StorageService:
                 id=uuid.UUID(row[0]), name=row[1], item_type=item_type, slot=slot,
                 weapon_class=w_class, weapon_hands=w_hand, damage_type=dmg_type,
                 bonus_str=row[7], bonus_int=row[8], bonus_dex=row[9], bonus_vit=row[10], bonus_def=row[11],
-                base_dmg=row[12], price=row[13], level=row[14], image_path=row[15]
+                base_dmg=row[12],
+                double_attack_chance=row[13],  # <---
+                price=row[14], level=row[15], image_path=row[16]
             )
             items.append(item)
         return items
 
-    # ... (Тут мають бути всі інші методи: create_hero, update_hero, save_goal тощо з попередньої версії) ...
-    # (Скопіюйте їх, щоб файл був повним, або просто замініть seed_items та init_db у вашому файлі)
+    # create_hero, get_hero_by_... , save_goal, load_goals ... (код із попередніх відповідей)
+    # ПОВНИЙ КОД цих методів вже є у вас, головне змінити init_db та seed_items.
+    # Для скорочення я їх тут не дублюю, але вони повинні бути в класі.
+    # Код для Auth та Goals можна скопіювати з попереднього `storage.py`
+    # (Тільки перевірте load_long_term_goals, там я додав last_checkin вище в init_db)
 
-    # --- Auth & Hero ---
+    # ... (решта методів Auth, Goal, LongTermGoal, Enemy - без змін, окрім перевірки наявності таблиць)
     def create_hero(self, hero: Hero):
         conn = self._get_connection()
         try:
@@ -336,12 +342,8 @@ class StorageService:
 
     def _map_row_to_hero(self, row) -> Hero:
         return Hero(
-            id=uuid.UUID(row[0]),
-            nickname=row[1],
-            hero_class=HeroClass(row[2]),
-            gender=Gender(row[3]),
-            appearance=row[4],
-            level=row[5], current_xp=row[6], xp_to_next_level=row[7],
+            id=uuid.UUID(row[0]), nickname=row[1], hero_class=HeroClass(row[2]), gender=Gender(row[3]),
+            appearance=row[4], level=row[5], current_xp=row[6], xp_to_next_level=row[7],
             gold=row[8], streak_days=row[9], hp=row[10], max_hp=row[11],
             stat_points=row[12], str_stat=row[13], int_stat=row[14], dex_stat=row[15],
             vit_stat=row[16], def_stat=row[17], mana=row[18], max_mana=row[19],
@@ -351,10 +353,7 @@ class StorageService:
     def update_hero(self, hero: Hero):
         conn = self._get_connection()
         conn.execute("""
-            UPDATE heroes SET 
-                level=?, current_xp=?, xp_to_next_level=?, gold=?, streak_days=?, hp=?, max_hp=?, last_login=?,
-                stat_points=?, str_stat=?, int_stat=?, dex_stat=?, vit_stat=?, def_stat=?, mana=?, max_mana=?
-            WHERE id=?
+            UPDATE heroes SET level=?, current_xp=?, xp_to_next_level=?, gold=?, streak_days=?, hp=?, max_hp=?, last_login=?, stat_points=?, str_stat=?, int_stat=?, dex_stat=?, vit_stat=?, def_stat=?, mana=?, max_mana=? WHERE id=?
         """, (
             hero.level, hero.current_xp, hero.xp_to_next_level, hero.gold, hero.streak_days,
             hero.hp, hero.max_hp, hero.last_login.isoformat(),
@@ -365,7 +364,6 @@ class StorageService:
         conn.commit()
         conn.close()
 
-    # --- Goals ---
     def save_goal(self, goal: Goal, hero_id: str):
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -375,7 +373,6 @@ class StorageService:
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (str(goal.id), hero_id, goal.title, goal.description, goal.deadline.isoformat(), goal.difficulty.value,
                   goal.created_at.isoformat(), 1 if goal.is_completed else 0, 1 if goal.penalty_applied else 0))
-
             cursor.execute("DELETE FROM sub_goals WHERE goal_id = ?", (str(goal.id),))
             for sub in goal.subgoals:
                 cursor.execute("INSERT INTO sub_goals (id, goal_id, title, is_completed) VALUES (?, ?, ?, ?)",
@@ -394,9 +391,8 @@ class StorageService:
         rows = cursor.fetchall()
         for row in rows:
             g_id, title, desc, dl_str, diff_val, ca_str, is_comp, is_penalized = row
-            goal = Goal(
-                title=title, description=desc, deadline=datetime.fromisoformat(dl_str), difficulty=Difficulty(diff_val)
-            )
+            goal = Goal(title=title, description=desc, deadline=datetime.fromisoformat(dl_str),
+                        difficulty=Difficulty(diff_val))
             goal.id = uuid.UUID(g_id)
             goal.created_at = datetime.fromisoformat(ca_str)
             goal.is_completed = bool(is_comp)
@@ -417,17 +413,17 @@ class StorageService:
         conn.commit()
         conn.close()
 
-    # --- Long Term Goals ---
     def save_long_term_goal(self, goal: LongTermGoal, hero_id: str):
         conn = self._get_connection()
         last_update = goal.last_update_date.isoformat() if goal.last_update_date else None
+        last_checkin = goal.last_checkin.isoformat() if goal.last_checkin else None
         conn.execute("""
             INSERT OR REPLACE INTO long_term_goals 
-            (id, hero_id, title, description, total_days, start_date, time_frame, current_day, checked_days, missed_days, is_completed, daily_state, last_update_date)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (id, hero_id, title, description, total_days, start_date, time_frame, current_day, checked_days, missed_days, is_completed, daily_state, last_update_date, last_checkin)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (str(goal.id), hero_id, goal.title, goal.description, goal.total_days, goal.start_date.isoformat(),
               goal.time_frame, goal.current_day, goal.checked_days, goal.missed_days, 1 if goal.is_completed else 0,
-              goal.daily_state, last_update))
+              goal.daily_state, last_update, last_checkin))
         conn.commit()
         conn.close()
 
@@ -449,22 +445,20 @@ class StorageService:
             g.is_completed = bool(row[10])
             g.daily_state = row[11]
             if row[12]: g.last_update_date = datetime.fromisoformat(row[12])
+            if row[13]: g.last_checkin = datetime.fromisoformat(row[13])
             goals.append(g)
         conn.close()
         return goals
 
-    # --- Enemy Management ---
     def save_enemy(self, enemy: Enemy, hero_id: str):
         conn = self._get_connection()
         conn.execute("""
             INSERT OR REPLACE INTO current_enemies 
             (hero_id, id, name, rarity, level, current_hp, max_hp, damage, damage_type, reward_xp, reward_gold, drop_chance, image_path)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            hero_id, str(enemy.id), enemy.name, enemy.rarity.value, enemy.level,
-            enemy.current_hp, enemy.max_hp, enemy.damage, enemy.damage_type.value,
-            enemy.reward_xp, enemy.reward_gold, enemy.drop_chance, enemy.image_path
-        ))
+        """, (hero_id, str(enemy.id), enemy.name, enemy.rarity.value, enemy.level, enemy.current_hp, enemy.max_hp,
+              enemy.damage, enemy.damage_type.value, enemy.reward_xp, enemy.reward_gold, enemy.drop_chance,
+              enemy.image_path))
         conn.commit()
         conn.close()
 

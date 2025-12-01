@@ -13,6 +13,13 @@ class Difficulty(Enum):
     EPIC = 4
 
 
+class Difficulty(Enum):
+    EASY = 1
+    MEDIUM = 2
+    HARD = 3
+    EPIC = 4
+
+
 class HeroClass(Enum):
     WARRIOR = "Воїн"
     ARCHER = "Лучник"
@@ -37,28 +44,27 @@ class DamageType(Enum):
     MAGICAL = "Магічний"
 
 
-# --- Inventory & Equipment ---
 class ItemType(Enum):
     WEAPON = "Зброя"
     ARMOR = "Броня"
 
 
 class EquipmentSlot(Enum):
-    HEAD = "Голова"  # +INT
-    BODY = "Тіло"  # +HP (more), +DEF (less)
-    LEGS = "Ноги"  # +HP (less), +DEF (more)
-    FEET = "Взуття"  # +DEX
-    HANDS = "Руки"  # +STR (Gloves)
+    HEAD = "Голова"
+    BODY = "Тіло"
+    LEGS = "Ноги"
+    FEET = "Взуття"
+    HANDS = "Руки"
     MAIN_HAND = "Права рука"
     OFF_HAND = "Ліва рука"
 
 
 class WeaponClass(Enum):
-    SWORD = "Меч"  # Воїн (Bleed chance)
-    BOW = "Лук"  # Лучник (Crit x2 chance)
-    STAFF = "Посох"  # Маг (Spell chance)
-    DAGGER = "Кинджал"  # Розбійник (Parry chance)
-    SHIELD = "Щит"  # Будь-хто (Defense)
+    SWORD = "Меч"
+    BOW = "Лук"
+    STAFF = "Посох"
+    DAGGER = "Кинджал"
+    SHIELD = "Щит"
     NONE = "Немає"
 
 
@@ -80,13 +86,16 @@ class Item:
     weapon_hands: WeaponHandType = WeaponHandType.ONE_HANDED
     damage_type: DamageType = DamageType.PHYSICAL
 
-    # Бонуси (+1, +2 і т.д.)
+    # Бонуси
     bonus_str: int = 0
     bonus_int: int = 0
     bonus_dex: int = 0
     bonus_vit: int = 0
     bonus_def: int = 0
-    base_dmg: int = 0  # Базовий урон зброї
+    base_dmg: int = 0
+
+    # НОВЕ ПОЛЕ: Шанс подвійної атаки (%)
+    double_attack_chance: int = 0
 
     price: int = 0
     level: int = 1
@@ -97,12 +106,12 @@ class Item:
 
 @dataclass
 class InventoryItem:
-    """Конкретний предмет у інвентарі героя."""
     item: Item
     is_equipped: bool = False
     id: uuid.UUID = field(default_factory=uuid.uuid4)
 
 
+# ... (Hero, Enemy, Goal, SubGoal, LongTermGoal залишаються без змін) ...
 @dataclass
 class Hero:
     nickname: str
@@ -119,7 +128,6 @@ class Hero:
     hp: int = 100
     max_hp: int = 100
 
-    # Характеристики
     stat_points: int = 0
     str_stat: int = 0
     int_stat: int = 0
@@ -205,6 +213,7 @@ class LongTermGoal:
     daily_state: str = "pending"
     last_update_date: Optional[datetime] = None
     id: uuid.UUID = field(default_factory=uuid.uuid4)
+    last_checkin: Optional[datetime] = None  # <--- ДОДАНО, щоб фіксити помилку зчитування
 
     def calculate_progress(self) -> float:
         return (self.current_day / self.total_days) * 100.0
