@@ -32,13 +32,57 @@ class EnemyRarity(Enum):
     BOSS = "Бос"
 
 
-# НОВЕ: Тип нанесення урону
 class DamageType(Enum):
     PHYSICAL = "Фізичний"
     MAGICAL = "Магічний"
 
 
+# --- НОВЕ: Інвентар та Спорядження ---
+class ItemType(Enum):
+    WEAPON = "Зброя"
+    ARMOR = "Броня"
+    # Можна додати POTION, SCROLL в майбутньому
+
+
+class EquipmentSlot(Enum):
+    HEAD = "Голова"  # Шолом
+    BODY = "Тіло"  # Обладунок
+    LEGS = "Ноги"  # Штани/Поножі
+    FEET = "Взуття"  # Черевики
+    HANDS = "Руки"  # Рукавички
+    MAIN_HAND = "Права рука"  # Зброя
+    OFF_HAND = "Ліва рука"  # Щит або друга зброя
+
+
 # --- Models ---
+@dataclass
+class Item:
+    """Модель предмета (шаблон)."""
+    name: str
+    item_type: ItemType
+    slot: Optional[EquipmentSlot]  # None, якщо це просто мотлох
+
+    # Бонуси
+    bonus_str: int = 0
+    bonus_int: int = 0
+    bonus_dex: int = 0
+    bonus_vit: int = 0
+    bonus_def: int = 0
+
+    price: int = 0
+    image_path: str = ""  # Шлях до іконки
+
+    id: uuid.UUID = field(default_factory=uuid.uuid4)
+
+
+@dataclass
+class InventoryItem:
+    """Конкретний предмет у інвентарі героя."""
+    item: Item
+    is_equipped: bool = False
+    id: uuid.UUID = field(default_factory=uuid.uuid4)  # Унікальний ID екземпляра
+
+
 @dataclass
 class Hero:
     nickname: str
@@ -55,13 +99,13 @@ class Hero:
     hp: int = 100
     max_hp: int = 100
 
-    # Характеристики
+    # Характеристики (Базові)
     stat_points: int = 0
-    str_stat: int = 0  # Сила
-    int_stat: int = 0  # Інтелект
-    dex_stat: int = 0  # Спритність
-    vit_stat: int = 0  # Витривалість
-    def_stat: int = 0  # Захист
+    str_stat: int = 0
+    int_stat: int = 0
+    dex_stat: int = 0
+    vit_stat: int = 0
+    def_stat: int = 0
 
     mana: int = 10
     max_mana: int = 10
@@ -84,9 +128,7 @@ class Enemy:
     current_hp: int
     max_hp: int
     damage: int
-    # НОВЕ: Тип атаки ворога
     damage_type: DamageType
-
     reward_xp: int
     reward_gold: int
     drop_chance: float
@@ -121,10 +163,8 @@ class Goal:
         self.subgoals.append(subgoal)
 
     def calculate_progress(self) -> float:
-        if not self.subgoals:
-            return 100.0 if self.is_completed else 0.0
-        completed_count = sum(1 for sg in self.subgoals if sg.is_completed)
-        return (completed_count / len(self.subgoals)) * 100.0
+        if not self.subgoals: return 100.0 if self.is_completed else 0.0
+        return (sum(1 for sg in self.subgoals if sg.is_completed) / len(self.subgoals)) * 100.0
 
     def is_overdue(self) -> bool:
         if self.is_completed: return False
