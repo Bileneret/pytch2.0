@@ -21,27 +21,24 @@ class SkillsDialog(QDialog):
 
         layout = QVBoxLayout(self)
 
-        # Отримуємо дані
         hero = self.service.get_hero()
-        skills = self.service.get_skills()  # Метод з SkillLogic
+        # Тепер цей виклик спрацює, бо ми додали SkillLogic до GoalService
+        skills = self.service.get_skills()
 
-        # Заголовок
         lbl_header = QLabel(f"Навички: {hero.hero_class.value}")
         lbl_header.setStyleSheet("font-size: 18px; font-weight: bold; color: #8e44ad; margin-bottom: 10px;")
         lbl_header.setAlignment(Qt.AlignCenter)
         layout.addWidget(lbl_header)
 
-        # Список
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setStyleSheet("border: none;")
         container = QWidget()
         vbox = QVBoxLayout(container)
 
-        class_map = {
-            "Воїн": "knight", "Лучник": "archer", "Маг": "mage", "Розбійник": "rogue"
-        }
-        cls_folder = class_map.get(hero.hero_class.value, "knight")
+        class_map = {"Воїн": "knight", "Лучник": "archer", "Маг": "mage", "Розбійник": "rogue"}
+        cls_name = hero.hero_class.value if hasattr(hero.hero_class, 'value') else "Воїн"
+        cls_folder = class_map.get(cls_name, "knight")
         base_path = get_project_root()
 
         for s in skills:
@@ -49,7 +46,6 @@ class SkillsDialog(QDialog):
             frame.setStyleSheet("background-color: #f0f2f5; border-radius: 8px; border: 1px solid #bdc3c7;")
             row = QHBoxLayout(frame)
 
-            # Іконка
             lbl_icon = QLabel()
             lbl_icon.setFixedSize(50, 50)
             lbl_icon.setAlignment(Qt.AlignCenter)
@@ -61,7 +57,6 @@ class SkillsDialog(QDialog):
             else:
                 lbl_icon.setText("🔮")
 
-            # Текст
             text_layout = QVBoxLayout()
             name_lbl = QLabel(f"{s['name']} (Lvl {s['level_req']})")
             name_lbl.setStyleSheet("font-weight: bold; font-size: 14px;")
@@ -77,12 +72,13 @@ class SkillsDialog(QDialog):
             text_layout.addWidget(desc_lbl)
             text_layout.addWidget(cost_lbl)
 
-            # Статус (Відкрито/Закрито)
             status_lbl = QLabel()
             if hero.level >= s['level_req']:
                 status_lbl.setText("✅")
+                status_lbl.setStyleSheet("color: green; font-size: 20px;")
             else:
                 status_lbl.setText("🔒")
+                status_lbl.setStyleSheet("color: gray; font-size: 20px;")
 
             row.addWidget(lbl_icon)
             row.addLayout(text_layout)

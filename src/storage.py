@@ -206,7 +206,7 @@ class StorageService:
         if any(x in name_lower for x in
                ["штани", "поножі", "legs"]): return ItemType.ARMOR, EquipmentSlot.LEGS, WeaponClass.NONE
         if any(x in name_lower for x in
-               ["взуття", "черевики", "чобіт", "boots"]): return ItemType.ARMOR, EquipmentSlot.FEET, WeaponClass.NONE
+               ["чоботи", "взуття", "черевики", "чобіт", "boots"]): return ItemType.ARMOR, EquipmentSlot.FEET, WeaponClass.NONE
         if any(x in name_lower for x in
                ["рукавиці", "перчатки", "gloves"]): return ItemType.ARMOR, EquipmentSlot.HANDS, WeaponClass.NONE
 
@@ -445,4 +445,3 @@ class StorageService:
         conn.commit()
         conn.close()
 
-    

@@ -1,12 +1,12 @@
-import os
-import sys
 from datetime import datetime, timedelta
 from PyQt5.QtWidgets import (
     QFrame, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QLabel, QPushButton, QSizePolicy, QWidget, QMessageBox
+    QLabel, QPushButton, QSizePolicy, QWidget
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QTime, QSize
 from PyQt5.QtGui import QIcon
+import os
+import sys
 
 
 def get_project_root():
@@ -18,7 +18,7 @@ class MiddlePanel(QFrame):
     skills_clicked = pyqtSignal()
     inventory_clicked = pyqtSignal()
     shop_clicked = pyqtSignal()
-    skill_used_signal = pyqtSignal(int)  # Сигнал: використано навичку (id)
+    skill_used_signal = pyqtSignal(int)
 
     logout_clicked = pyqtSignal()
     debug_time_clicked = pyqtSignal()
@@ -61,14 +61,18 @@ class MiddlePanel(QFrame):
         # --- 2. МЕНЮ КНОПОК (2x2) ---
         grid = QGridLayout()
         grid.setSpacing(15)
+
+        # Магазин
         self.btn_shop = self.create_menu_button("Магазин", "#f1c40f", "#f39c12", "#2c3e50")
         self.btn_shop.clicked.connect(self.shop_clicked.emit)
         grid.addWidget(self.btn_shop, 0, 0)
+
+        # Інвентар
         self.btn_inventory = self.create_menu_button("Інвентар", "#e67e22", "#d35400")
         self.btn_inventory.clicked.connect(self.inventory_clicked.emit)
         grid.addWidget(self.btn_inventory, 0, 1)
 
-        # Характеристики
+        # Характеристики (З контейнером для тексту)
         stats_cont = QWidget();
         stats_l = QVBoxLayout(stats_cont);
         stats_l.setContentsMargins(0, 0, 0, 0);
@@ -82,15 +86,21 @@ class MiddlePanel(QFrame):
         stats_l.addWidget(self.lbl_stats_summary)
         grid.addWidget(stats_cont, 1, 0)
 
-        # Навички
+        # Навички (З контейнером для тексту - ВИПРАВЛЕНО СТИЛЬ)
         skills_cont = QWidget();
         skills_l = QVBoxLayout(skills_cont);
         skills_l.setContentsMargins(0, 0, 0, 0);
         skills_l.setSpacing(5)
+        # Використовуємо той самий метод create_menu_button, щоб стиль був ідентичний
         self.btn_skills = self.create_menu_button("Навички", "#9b59b6", "#8e44ad")
         self.btn_skills.clicked.connect(self.skills_clicked.emit)
+
+        self.lbl_skills_summary = QLabel("Skills...");
+        self.lbl_skills_summary.setAlignment(Qt.AlignCenter);
+        self.lbl_skills_summary.setStyleSheet("font-size: 9px; color: #bdc3c7;")
+
         skills_l.addWidget(self.btn_skills)
-        # Місце для швидких слотів (будуть нижче в окремому блоці, тут просто кнопка)
+        skills_l.addWidget(self.lbl_skills_summary)
         grid.addWidget(skills_cont, 1, 1)
 
         main_layout.addLayout(grid)
@@ -115,7 +125,6 @@ class MiddlePanel(QFrame):
                 QPushButton:hover { border: 1px solid #9b59b6; }
                 QPushButton:disabled { background-color: #2c3e50; border: 1px solid #2c3e50; }
             """)
-            # Прив'язка ID (1..5)
             btn.clicked.connect(lambda checked, sid=i + 1: self.skill_used_signal.emit(sid))
             self.skill_buttons.append(btn)
             self.skills_box.addWidget(btn)
@@ -135,36 +144,40 @@ class MiddlePanel(QFrame):
     def update_data(self, hero, simulated_time):
         self.lbl_stats_summary.setText(
             f"⚔️{hero.str_stat} 🧠{hero.int_stat} 🎯{hero.dex_stat} ❤️{hero.vit_stat} 🛡️{hero.def_stat}")
+
+        # Відображення кількості відкритих навичок
+        unlocked_count = 0
+        for lvl in [5, 10, 15, 20, 25]:
+            if hero.level >= lvl: unlocked_count += 1
+        self.lbl_skills_summary.setText(f"Відкрито: {unlocked_count}/5")
+
         self.lbl_clock.setText(simulated_time.strftime("%H:%M:%S"))
         if hero.nickname.lower() == "tester":
             self.btn_debug.show()
         else:
             self.btn_debug.hide()
 
-        # Оновлення іконок навичок
-        class_map = {
-            "Воїн": "knight", "Лучник": "archer", "Маг": "mage", "Розбійник": "rogue"
-        }
-        cls_folder = class_map.get(hero.hero_class.value, "knight")
-        base_path = get_project_root()
+        # Оновлення іконок навичок (швидкі слоти)
+        class_map = {"Воїн": "knight", "Лучник": "archer", "Маг": "mage", "Розбійник": "rogue"}
+        # За замовчуванням knight, якщо клас не знайдено
+        cls_name = hero.hero_class.value if hasattr(hero.hero_class, 'value') else "Воїн"
+        cls_folder = class_map.get(cls_name, "knight")
 
+        base_path = get_project_root()
         skill_levels = [5, 10, 15, 20, 25]
 
         for i, btn in enumerate(self.skill_buttons):
             lvl_req = skill_levels[i]
-
             if hero.level >= lvl_req:
                 btn.setEnabled(True)
-                # Завантаження іконки
                 icon_path = os.path.join(base_path, "assets", "skills", cls_folder, f"skill{i + 1}.png")
                 if os.path.exists(icon_path):
                     btn.setIcon(QIcon(icon_path))
                     btn.setIconSize(QSize(32, 32))
-                    btn.setToolTip(f"Skill {i + 1} (Lvl {lvl_req})")
+                    btn.setText("")
                 else:
                     btn.setText(f"S{i + 1}")
             else:
                 btn.setEnabled(False)
                 btn.setIcon(QIcon())
                 btn.setText("🔒")
-                btn.setToolTip(f"Відкриється на {lvl_req} рівні")
