@@ -5,7 +5,7 @@ from ..enemy_mechanics import EnemyGenerator
 
 
 class CombatLogic:
-    """Міксин: Бойова система."""
+    """Міксин: Бойова система з урахуванням спорядження."""
 
     def get_current_enemy(self):
         enemy = self.storage.load_enemy(self.hero_id)
@@ -15,14 +15,34 @@ class CombatLogic:
             self.storage.save_enemy(enemy, self.hero_id)
         return enemy
 
+    def _get_total_stats(self, hero):
+        """
+        Повертає реальні характеристики (База + Бонуси від речей).
+        Повертає словник.
+        """
+        # Цей метод (calculate_equipment_bonuses) прийде з ItemLogic,
+        # тому важливо, щоб GoalService успадковував і ItemLogic теж.
+        bonuses = self.calculate_equipment_bonuses()
+
+        return {
+            'str': hero.str_stat + bonuses['str'],
+            'int': hero.int_stat + bonuses['int'],
+            'dex': hero.dex_stat + bonuses['dex'],
+            'vit': hero.vit_stat + bonuses['vit'],
+            'def': hero.def_stat + bonuses['def']
+        }
+
     def calculate_hero_damage(self, hero) -> Tuple[int, int]:
         """
-        Повертає (фізичний урон, магічний урон).
-        Сила (STR) -> Фіз.
-        Інтелект (INT) -> Маг.
+        Повертає (фіз. урон, маг. урон).
+        Враховує бонуси від спорядження.
         """
-        bonus_phys = hero.str_stat * 2
-        bonus_magic = hero.int_stat * 2
+        stats = self._get_total_stats(hero)
+
+        # Формула: База + (Сила * 2)
+        bonus_phys = stats['str'] * 2
+        # Формула: (Інтелект * 2)
+        bonus_magic = stats['int'] * 2
 
         total_phys = hero.base_damage + bonus_phys
         total_magic = bonus_magic
@@ -31,16 +51,18 @@ class CombatLogic:
 
     def take_damage(self, hero, enemy) -> int:
         """
-        Розрахунок отримання урону від ворога.
-        Захист (DEF) зменшує урон. Спритність (DEX) дає шанс ухилення.
+        Розрахунок отримання урону.
+        Враховує бонуси захисту та спритності.
         """
-        # 1. Ухилення
-        dodge_chance = hero.dex_stat * 1.0
+        stats = self._get_total_stats(hero)
+
+        # 1. Ухилення (Спритність)
+        dodge_chance = stats['dex'] * 1.0
         if random.uniform(0, 100) < dodge_chance:
             return 0  # Ухилився!
 
-        # 2. Зменшення урону
-        reduction = hero.def_stat * 2
+        # 2. Зменшення урону (Захист)
+        reduction = stats['def'] * 2
         final_damage = max(1, enemy.damage - reduction)
 
         hero.hp -= final_damage
@@ -48,9 +70,6 @@ class CombatLogic:
         return final_damage
 
     def attack_enemy(self, phys_dmg: int = 0, magic_dmg: int = 0) -> Tuple[str, bool, Optional[str]]:
-        """
-        Наносить урон ворогу. Якщо 0,0 - авторозрахунок.
-        """
         hero = self.get_hero()
         enemy = self.get_current_enemy()
 
@@ -73,6 +92,8 @@ class CombatLogic:
 
             if random.random() < enemy.drop_chance:
                 loot_info += "\n🎁 Випав предмет спорядження! (В розробці)"
+                # Тут можна буде додати логіку видачі рандомного предмета
+                # self.give_random_loot()
 
             msg = f"{msg}\n💀 {enemy.name} переможено!\n{loot_info}"
 
