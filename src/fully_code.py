@@ -976,7 +976,7 @@ class MainWindow(QMainWindow):
         self.lbl_level.setStyleSheet(
             "font-size: 20px; color: #f1c40f; font-weight: bold; background: transparent; border: none;")
 
-        self.lbl_hp = QLabel("❤️ 100/100")
+        self.lbl_hp = QLabel("🧡 100/100")
         self.lbl_hp.setStyleSheet(
             "font-size: 15px; color: #e74c3c; font-weight: bold; margin-left: 15px; background: transparent; border: none;")
 
@@ -1096,7 +1096,7 @@ class MainWindow(QMainWindow):
             # 1. Оновлення Героя
             hero = self.service.get_hero()
             self.lbl_level.setText(f"Lvl {hero.level}")
-            self.lbl_hp.setText(f"❤️ {hero.hp}/{hero.max_hp}")
+            self.lbl_hp.setText(f"🧡 {hero.hp}/{hero.max_hp}")
             self.lbl_gold.setText(f"💰 {hero.gold}")
 
             self.xp_bar.setMaximum(hero.xp_to_next_level)

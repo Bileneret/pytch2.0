@@ -30,7 +30,7 @@ class StatsDialog(QDialog):
         self.create_stat_row("Сила ⚔️", "str_stat", "+2 Фіз. Урон")
         self.create_stat_row("Інтелект 🧠", "int_stat", "+2 Маг. Урон, +5 Мана")
         self.create_stat_row("Спритність 🎯", "dex_stat", "+1% Ухилення")
-        self.create_stat_row("Здоров'я ❤️", "vit_stat", "+5 Макс. HP")
+        self.create_stat_row("Здоров'я 🧡", "vit_stat", "+5 Макс. HP")
         self.create_stat_row("Захист 🛡️", "def_stat", "-2 Отримуваний урон")
 
         layout.addLayout(self.stats_layout)

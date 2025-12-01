@@ -2,11 +2,11 @@ import os
 import sys
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QScrollArea, QFrame, QWidget, QMessageBox
+    QScrollArea, QFrame, QGridLayout, QWidget, QMessageBox, QSizePolicy
 )
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QPixmap
-from src.models import EquipmentSlot
+from PyQt5.QtCore import Qt, QSize
+from PyQt5.QtGui import QPixmap, QIcon
+from src.models import EquipmentSlot, Item
 
 
 def get_project_root():
@@ -23,7 +23,7 @@ class InventoryDialog(QDialog):
 
         self.layout = QHBoxLayout(self)
 
-        # --- ЛІВА ЧАСТИНА: СУМКА ---
+        # --- ЛІВА ЧАСТИНА: СУМКА (GRID) ---
         self.left_panel = QWidget()
         self.left_layout = QVBoxLayout(self.left_panel)
 
@@ -35,10 +35,12 @@ class InventoryDialog(QDialog):
         self.scroll_area.setStyleSheet("border: none; background-color: #f0f2f5;")
 
         self.items_container = QWidget()
-        self.items_layout = QVBoxLayout(self.items_container)
-        self.items_layout.setAlignment(Qt.AlignTop)
-        self.scroll_area.setWidget(self.items_container)
+        # Використовуємо GRID замість VBox
+        self.items_grid = QGridLayout(self.items_container)
+        self.items_grid.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        self.items_grid.setSpacing(10)
 
+        self.scroll_area.setWidget(self.items_container)
         self.left_layout.addWidget(self.scroll_area)
 
         # --- ПРАВА ЧАСТИНА: СПОРЯДЖЕННЯ ---
@@ -53,13 +55,9 @@ class InventoryDialog(QDialog):
 
         self.slot_widgets = {}
         display_order = [
-            EquipmentSlot.HEAD,
-            EquipmentSlot.BODY,
-            EquipmentSlot.HANDS,
-            EquipmentSlot.LEGS,
-            EquipmentSlot.FEET,
-            EquipmentSlot.MAIN_HAND,
-            EquipmentSlot.OFF_HAND
+            EquipmentSlot.HEAD, EquipmentSlot.BODY, EquipmentSlot.HANDS,
+            EquipmentSlot.LEGS, EquipmentSlot.FEET,
+            EquipmentSlot.MAIN_HAND, EquipmentSlot.OFF_HAND
         ]
 
         for slot in display_order:
@@ -98,7 +96,6 @@ class InventoryDialog(QDialog):
         self.right_layout.addWidget(self.slots_container)
         self.right_layout.addStretch()
 
-        # Бонуси
         self.lbl_bonuses = QLabel("Бонуси: 0")
         self.lbl_bonuses.setStyleSheet(
             "color: #27ae60; font-weight: bold; border: 1px solid #27ae60; padding: 10px; border-radius: 5px;")
@@ -118,48 +115,48 @@ class InventoryDialog(QDialog):
 
     def refresh_ui(self):
         """Оновлює інтерфейс."""
-        # 1. Очищаємо список предметів
-        while self.items_layout.count():
-            child = self.items_layout.takeAt(0)
-            if child.widget(): child.widget().deleteLater()
+        # Очищення гріду
+        for i in reversed(range(self.items_grid.count())):
+            self.items_grid.itemAt(i).widget().setParent(None)
 
         try:
             inventory = self.service.get_inventory()
-
             equipped_items = {item.item.slot: item for item in inventory if item.is_equipped}
             bag_items = [item for item in inventory if not item.is_equipped]
 
-            # --- Заповнюємо сумку ---
+            # --- ЗАПОВНЮЄМО СУМКУ (GRID) ---
             if not bag_items:
-                self.items_layout.addWidget(
-                    QLabel("Інвентар порожній", styleSheet="color: gray; margin-top: 20px;", alignment=Qt.AlignCenter))
+                self.items_grid.addWidget(QLabel("Інвентар порожній", styleSheet="color: gray;"), 0, 0)
             else:
+                columns = 4  # Кількість колонок
+                row, col = 0, 0
                 for inv_item in bag_items:
-                    self.create_item_card(inv_item)
+                    item_widget = self.create_grid_item(inv_item)
+                    self.items_grid.addWidget(item_widget, row, col)
 
-            # --- Оновлюємо слоти ---
+                    col += 1
+                    if col >= columns:
+                        col = 0
+                        row += 1
+
+            # --- ОНОВЛЕННЯ СЛОТІВ ---
             total_bonuses = {'str': 0, 'int': 0, 'dex': 0, 'vit': 0, 'def': 0, 'base_dmg': 0}
 
             for slot, widgets in self.slot_widgets.items():
-                # Безпечне відключення сигналів
                 try:
                     widgets['btn'].clicked.disconnect()
                 except TypeError:
-                    pass  # Якщо сигнал не був підключений - ігноруємо
+                    pass
 
                 if slot in equipped_items:
                     item = equipped_items[slot].item
                     widgets['name_lbl'].setText(f"{item.name}")
                     widgets['btn'].show()
-
-                    # Важливо: lambda має захоплювати ID
                     widgets['btn'].clicked.connect(
                         lambda checked, i_id=equipped_items[slot].id: self.unequip_item(i_id))
-
                     widgets['frame'].setStyleSheet(
-                        "background-color: #d5f5e3; border-radius: 5px; border: 1px solid #2ecc71;")  # Зелений
+                        "background-color: #d5f5e3; border-radius: 5px; border: 1px solid #2ecc71;")
 
-                    # Рахуємо бонуси
                     total_bonuses['str'] += item.bonus_str
                     total_bonuses['int'] += item.bonus_int
                     total_bonuses['dex'] += item.bonus_dex
@@ -172,12 +169,11 @@ class InventoryDialog(QDialog):
                     widgets['frame'].setStyleSheet(
                         "background-color: #ecf0f1; border-radius: 5px; border: 1px solid #bdc3c7;")
 
-            # --- Оновлюємо текст бонусів ---
             parts = []
             if total_bonuses['str']: parts.append(f"⚔️STR+{total_bonuses['str']}")
             if total_bonuses['int']: parts.append(f"🧠INT+{total_bonuses['int']}")
             if total_bonuses['dex']: parts.append(f"🎯DEX+{total_bonuses['dex']}")
-            if total_bonuses['vit']: parts.append(f"❤️VIT+{total_bonuses['vit']}")
+            if total_bonuses['vit']: parts.append(f"🧡VIT+{total_bonuses['vit']}")
             if total_bonuses['def']: parts.append(f"🛡️DEF+{total_bonuses['def']}")
             if total_bonuses['base_dmg']: parts.append(f"💥DMG+{total_bonuses['base_dmg']}")
 
@@ -187,59 +183,118 @@ class InventoryDialog(QDialog):
         except Exception as e:
             print(f"Inventory Error: {e}")
             import traceback
-            traceback.print_exc()  # Це покаже повний стек помилки в консолі
+            traceback.print_exc()
 
-    def create_item_card(self, inv_item):
-        frame = QFrame()
-        frame.setStyleSheet("background-color: white; border: 1px solid #bdc3c7; border-radius: 5px;")
-        layout = QHBoxLayout(frame)
+    def create_grid_item(self, inv_item):
+        """Створює іконку предмета для гріду."""
+        btn = QPushButton()
+        btn.setFixedSize(80, 80)
+        btn.setCursor(Qt.PointingHandCursor)
+
+        # Стиль кнопки
+        btn.setStyleSheet("""
+            QPushButton {
+                background-color: white;
+                border: 1px solid #bdc3c7;
+                border-radius: 8px;
+            }
+            QPushButton:hover {
+                background-color: #ecf0f1;
+                border: 2px solid #3498db;
+            }
+        """)
 
         # Іконка
-        lbl_icon = QLabel("📦")
         if inv_item.item.image_path:
             base_path = get_project_root()
             img_path = os.path.join(base_path, "assets", "items", inv_item.item.image_path)
-            # Спробуємо і з папки enemies, якщо це заглушка
             if not os.path.exists(img_path):
-                img_path = os.path.join(base_path, "assets", "enemies", inv_item.item.image_path)
+                img_path = os.path.join(base_path, "assets", "enemies", inv_item.item.image_path)  # Fallback
 
             if os.path.exists(img_path):
-                pix = QPixmap(img_path).scaled(40, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                lbl_icon.setPixmap(pix)
-                lbl_icon.setText("")
+                icon = QIcon(img_path)
+                btn.setIcon(icon)
+                btn.setIconSize(QSize(60, 60))
+            else:
+                btn.setText("📦")  # Якщо немає картинки
+        else:
+            btn.setText("📦")
 
-        lbl_icon.setFixedSize(40, 40)
-        lbl_icon.setAlignment(Qt.AlignCenter)
-        layout.addWidget(lbl_icon)
+        # Підказка при наведенні
+        btn.setToolTip(f"{inv_item.item.name}\n{inv_item.item.item_type.value}")
 
-        # Інфо
-        info_layout = QVBoxLayout()
-        info_layout.addWidget(
-            QLabel(inv_item.item.name, styleSheet="font-weight: bold; font-size: 12px; color: #2c3e50;"))
+        # Клік відкриває детальне вікно
+        btn.clicked.connect(lambda: self.show_item_details(inv_item))
 
-        stats = []
-        if inv_item.item.bonus_str: stats.append(f"STR+{inv_item.item.bonus_str}")
-        if inv_item.item.bonus_int: stats.append(f"INT+{inv_item.item.bonus_int}")
-        if inv_item.item.bonus_def: stats.append(f"DEF+{inv_item.item.bonus_def}")
-        if inv_item.item.base_dmg: stats.append(f"DMG+{inv_item.item.base_dmg}")
-        stats_str = ", ".join(stats) if stats else "Звичайний"
+        return btn
 
-        info_layout.addWidget(
-            QLabel(f"{inv_item.item.item_type.value} | {stats_str}", styleSheet="color: gray; font-size: 10px;"))
-        layout.addLayout(info_layout)
+    def show_item_details(self, inv_item):
+        """Відкриває спливаюче вікно з інформацією про предмет."""
+        details = QDialog(self)
+        details.setWindowTitle(inv_item.item.name)
+        details.resize(300, 400)
+        details.setStyleSheet("background-color: white;")
+
+        layout = QVBoxLayout(details)
+
+        # Велика іконка
+        lbl_img = QLabel()
+        lbl_img.setAlignment(Qt.AlignCenter)
+        lbl_img.setFixedSize(150, 150)
+
+        if inv_item.item.image_path:
+            base_path = get_project_root()
+            img_path = os.path.join(base_path, "assets", "items", inv_item.item.image_path)
+            if not os.path.exists(img_path): img_path = os.path.join(base_path, "assets", "enemies",
+                                                                     inv_item.item.image_path)
+            if os.path.exists(img_path):
+                pix = QPixmap(img_path).scaled(150, 150, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                lbl_img.setPixmap(pix)
+        layout.addWidget(lbl_img, 0, Qt.AlignHCenter)
+
+        # Назва та тип
+        title = QLabel(inv_item.item.name)
+        title.setStyleSheet("font-weight: bold; font-size: 16px; color: #2c3e50;")
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+
+        type_lbl = QLabel(
+            f"{inv_item.item.item_type.value} | {inv_item.item.slot.value if inv_item.item.slot else 'Сміття'}")
+        type_lbl.setStyleSheet("color: gray; font-size: 12px;")
+        type_lbl.setAlignment(Qt.AlignCenter)
+        layout.addWidget(type_lbl)
+
+        # Характеристики
+        stats_text = ""
+        item = inv_item.item
+        if item.base_dmg: stats_text += f"💥 Урон: {item.base_dmg}\n"
+        if item.bonus_str: stats_text += f"⚔️ Сила: +{item.bonus_str}\n"
+        if item.bonus_int: stats_text += f"🧠 Інтелект: +{item.bonus_int}\n"
+        if item.bonus_dex: stats_text += f"🎯 Спритність: +{item.bonus_dex}\n"
+        if item.bonus_vit: stats_text += f"🧡 Здоров'я: +{item.bonus_vit}\n"
+        if item.bonus_def: stats_text += f"🛡️ Захист: +{item.bonus_def}\n"
+
+        stats_lbl = QLabel(stats_text)
+        stats_lbl.setStyleSheet("font-size: 14px; margin-top: 10px;")
+        stats_lbl.setAlignment(Qt.AlignCenter)
+        layout.addWidget(stats_lbl)
 
         layout.addStretch()
 
         # Кнопка "Вдягнути"
-        if inv_item.item.slot:
+        if item.slot:
             btn_equip = QPushButton("Вдягнути")
             btn_equip.setCursor(Qt.PointingHandCursor)
             btn_equip.setStyleSheet(
-                "background-color: #3498db; color: white; border: none; padding: 5px; border-radius: 3px; font-weight: bold;")
-            btn_equip.clicked.connect(lambda: self.equip_item(inv_item.id, inv_item.item.slot))
+                "background-color: #27ae60; color: white; font-weight: bold; padding: 10px; border-radius: 5px;")
+            btn_equip.clicked.connect(lambda: [self.equip_item(inv_item.id, item.slot), details.accept()])
             layout.addWidget(btn_equip)
 
-        self.items_layout.addWidget(frame)
+        btn_close = QPushButton("Закрити")
+        btn_close.clicked.connect(details.accept)
+        layout.addWidget(btn_close)
+
+        details.exec_()
 
     def equip_item(self, inv_id, slot):
         try:
