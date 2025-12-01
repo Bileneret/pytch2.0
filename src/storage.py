@@ -1,5 +1,8 @@
 import sqlite3
 import uuid
+import os
+import sys
+import re  # <--- Потрібно для розбору назви файлу
 from datetime import datetime
 from typing import List, Optional
 from .models import (
@@ -9,11 +12,16 @@ from .models import (
 )
 
 
+def get_project_root():
+    return os.path.dirname(os.path.abspath(sys.argv[0]))
+
+
 class StorageService:
     def __init__(self, db_path: str):
         self.db_path = db_path
         self.init_db()
-        self.seed_items()
+        # Тепер seed_items сканує папку
+        self.seed_items_from_folder()
 
     def _get_connection(self):
         conn = sqlite3.connect(self.db_path)
@@ -51,72 +59,17 @@ class StorageService:
             )
         """)
 
-        # Goals
+        # Goals & Subgoals
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS goals (
-                id TEXT PRIMARY KEY,
-                hero_id TEXT NOT NULL,
-                title TEXT NOT NULL,
-                description TEXT,
-                deadline TEXT,
-                difficulty INTEGER,
-                created_at TEXT,
-                is_completed INTEGER DEFAULT 0,
-                penalty_applied INTEGER DEFAULT 0,
-                FOREIGN KEY (hero_id) REFERENCES heroes (id) ON DELETE CASCADE
-            )
+                id TEXT PRIMARY KEY, hero_id TEXT NOT NULL, title TEXT NOT NULL, description TEXT, deadline TEXT, difficulty INTEGER, created_at TEXT, is_completed INTEGER DEFAULT 0, penalty_applied INTEGER DEFAULT 0, FOREIGN KEY (hero_id) REFERENCES heroes (id) ON DELETE CASCADE)
         """)
-
-        # SubGoals
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS sub_goals (
-                id TEXT PRIMARY KEY,
-                goal_id TEXT NOT NULL,
-                title TEXT NOT NULL,
-                is_completed INTEGER DEFAULT 0,
-                FOREIGN KEY (goal_id) REFERENCES goals (id) ON DELETE CASCADE
-            )
-        """)
-
-        # LongTerm Goals
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS long_term_goals (
-                id TEXT PRIMARY KEY,
-                hero_id TEXT NOT NULL,
-                title TEXT NOT NULL,
-                description TEXT,
-                total_days INTEGER,
-                start_date TEXT,
-                time_frame TEXT,
-                current_day INTEGER DEFAULT 1,
-                checked_days INTEGER DEFAULT 0,
-                missed_days INTEGER DEFAULT 0,
-                is_completed INTEGER DEFAULT 0,
-                daily_state TEXT DEFAULT 'pending',
-                last_update_date TEXT,
-                FOREIGN KEY (hero_id) REFERENCES heroes (id) ON DELETE CASCADE
-            )
-        """)
-
-        # Enemies
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS current_enemies (
-                hero_id TEXT PRIMARY KEY,
-                id TEXT NOT NULL,
-                name TEXT,
-                rarity TEXT,
-                level INTEGER,
-                current_hp INTEGER,
-                max_hp INTEGER,
-                damage INTEGER,
-                damage_type TEXT,
-                reward_xp INTEGER,
-                reward_gold INTEGER,
-                drop_chance REAL,
-                image_path TEXT, 
-                FOREIGN KEY (hero_id) REFERENCES heroes (id) ON DELETE CASCADE
-            )
-        """)
+        cursor.execute(
+            "CREATE TABLE IF NOT EXISTS sub_goals (id TEXT PRIMARY KEY, goal_id TEXT NOT NULL, title TEXT NOT NULL, is_completed INTEGER DEFAULT 0, FOREIGN KEY (goal_id) REFERENCES goals (id) ON DELETE CASCADE)")
+        cursor.execute(
+            "CREATE TABLE IF NOT EXISTS long_term_goals (id TEXT PRIMARY KEY, hero_id TEXT NOT NULL, title TEXT NOT NULL, description TEXT, total_days INTEGER, start_date TEXT, time_frame TEXT, current_day INTEGER DEFAULT 1, checked_days INTEGER DEFAULT 0, missed_days INTEGER DEFAULT 0, is_completed INTEGER DEFAULT 0, daily_state TEXT DEFAULT 'pending', last_update_date TEXT, FOREIGN KEY (hero_id) REFERENCES heroes (id) ON DELETE CASCADE)")
+        cursor.execute(
+            "CREATE TABLE IF NOT EXISTS current_enemies (hero_id TEXT PRIMARY KEY, id TEXT NOT NULL, name TEXT, rarity TEXT, level INTEGER, current_hp INTEGER, max_hp INTEGER, damage INTEGER, damage_type TEXT, reward_xp INTEGER, reward_gold INTEGER, drop_chance REAL, image_path TEXT, FOREIGN KEY (hero_id) REFERENCES heroes (id) ON DELETE CASCADE)")
 
         # Items Library
         cursor.execute("""
@@ -136,7 +89,7 @@ class StorageService:
                 base_dmg INTEGER DEFAULT 0,
                 price INTEGER DEFAULT 0,
                 level INTEGER DEFAULT 1,
-                image_path TEXT
+                image_path TEXT UNIQUE -- Щоб не дублювати при кожному запуску
             )
         """)
 
@@ -155,46 +108,115 @@ class StorageService:
         conn.commit()
         conn.close()
 
-    def seed_items(self):
+    # --- АВТОМАТИЧНИЙ ІМПОРТ ПРЕДМЕТІВ ---
+    def seed_items_from_folder(self):
+        """
+        Сканує папку assets/items.
+        Парсить файли формату: Назва_Предмета_STR_INT_DEX_VIT_DEF.png
+        """
+        base_path = get_project_root()
+        items_path = os.path.join(base_path, "assets", "items")
+
+        if not os.path.exists(items_path):
+            # Якщо папки немає - створюємо, щоб не було помилки, але нічого не додаємо
+            try:
+                os.makedirs(items_path)
+            except:
+                pass
+            return
+
+        files = os.listdir(items_path)
         conn = self._get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM items_library")
-        if cursor.fetchone()[0] == 0:
-            items = [
-                Item("Дерев'яний Меч", ItemType.WEAPON, EquipmentSlot.MAIN_HAND,
-                     weapon_class=WeaponClass.SWORD, base_dmg=2, bonus_str=1, price=10, image_path="sword_wood.png"),
-                Item("Сталевий Меч", ItemType.WEAPON, EquipmentSlot.MAIN_HAND,
-                     weapon_class=WeaponClass.SWORD, base_dmg=5, bonus_str=5, price=100, image_path="sword_steel.png"),
-                Item("Посох Новачка", ItemType.WEAPON, EquipmentSlot.MAIN_HAND,
-                     weapon_class=WeaponClass.STAFF, base_dmg=1, bonus_int=3, damage_type=DamageType.MAGICAL, price=15,
-                     image_path="staff_wood.png"),
 
-                Item("Тканинна Сорочка", ItemType.ARMOR, EquipmentSlot.BODY, bonus_def=1, price=5,
-                     image_path="cloth_chest.png"),
-                Item("Шкіряна Куртка", ItemType.ARMOR, EquipmentSlot.BODY, bonus_def=3, bonus_dex=1, price=50,
-                     image_path="leather_chest.png"),
-                Item("Залізний Шолом", ItemType.ARMOR, EquipmentSlot.HEAD, bonus_def=2, price=40,
-                     image_path="iron_helm.png"),
-            ]
+        # Регулярний вираз: (Будь-яка назва)_(STR)_(INT)_(DEX)_(VIT)_(DEF).png
+        # Приклад: Дерев'яний_Меч_5_4_2_1_2.png
+        pattern = re.compile(r"^(.*)_(\d+)_(\d+)_(\d+)_(\d+)_(\d+)\.png$", re.IGNORECASE)
 
-            for item in items:
-                cursor.execute("""
-                    INSERT INTO items_library (
-                        id, name, item_type, slot, weapon_class, weapon_hands, damage_type,
-                        bonus_str, bonus_int, bonus_dex, bonus_vit, bonus_def, base_dmg,
-                        price, level, image_path
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    str(item.id), item.name, item.item_type.value,
-                    item.slot.value if item.slot else None,
-                    item.weapon_class.value, item.weapon_hands.value, item.damage_type.value,
-                    item.bonus_str, item.bonus_int, item.bonus_dex, item.bonus_vit, item.bonus_def, item.base_dmg,
-                    item.price, item.level, item.image_path
-                ))
-            conn.commit()
+        count_added = 0
+
+        for filename in files:
+            match = pattern.match(filename)
+            if match:
+                raw_name = match.group(1)
+                str_val = int(match.group(2))
+                int_val = int(match.group(3))
+                dex_val = int(match.group(4))
+                vit_val = int(match.group(5))
+                def_val = int(match.group(6))
+
+                # Чистимо назву: "Дерев'яний_Меч" -> "Дерев'яний Меч"
+                clean_name = raw_name.replace("_", " ")
+
+                # Авто-визначення типу та слоту за назвою
+                item_type, slot, w_class = self._guess_item_type_and_slot(clean_name)
+
+                # Розрахунок ціни (базова формула від статів)
+                total_stats = str_val + int_val + dex_val + vit_val + def_val
+                price = total_stats * 10 + 5
+
+                # Базовий урон (для зброї беремо Силу або Інтелект як базу, або фіксовано)
+                base_dmg = 0
+                if item_type == ItemType.WEAPON:
+                    base_dmg = max(str_val, int_val)  # Спрощено
+
+                # Спробуємо додати в БД (IGNORE, якщо такий файл вже є)
+                try:
+                    item_id = str(uuid.uuid4())
+                    cursor.execute("""
+                        INSERT OR IGNORE INTO items_library (
+                            id, name, item_type, slot, weapon_class, weapon_hands, damage_type,
+                            bonus_str, bonus_int, bonus_dex, bonus_vit, bonus_def, base_dmg,
+                            price, level, image_path
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        item_id, clean_name, item_type.value, slot.value,
+                        w_class.value, WeaponHandType.ONE_HANDED.value, DamageType.PHYSICAL.value,
+                        str_val, int_val, dex_val, vit_val, def_val, base_dmg,
+                        price, 1, filename
+                    ))
+                    if cursor.rowcount > 0:
+                        count_added += 1
+                except Exception as e:
+                    print(f"Error adding item {filename}: {e}")
+
+        conn.commit()
         conn.close()
+        if count_added > 0:
+            print(f"Успішно імпортовано {count_added} нових предметів з папки!")
 
-    # --- Inventory ---
+    def _guess_item_type_and_slot(self, name: str):
+        """Евристика для визначення типу предмета за назвою."""
+        name_lower = name.lower()
+
+        # ЗБРОЯ
+        if any(x in name_lower for x in ["меч", "sword", "клинок"]):
+            return ItemType.WEAPON, EquipmentSlot.MAIN_HAND, WeaponClass.SWORD
+        if any(x in name_lower for x in ["лук", "bow", "арбалет"]):
+            return ItemType.WEAPON, EquipmentSlot.MAIN_HAND, WeaponClass.BOW
+        if any(x in name_lower for x in ["посох", "staff", "палиця"]):
+            return ItemType.WEAPON, EquipmentSlot.MAIN_HAND, WeaponClass.STAFF
+        if any(x in name_lower for x in ["кинджал", "кинджали", "ніж", "dagger", "knife"]):
+            return ItemType.WEAPON, EquipmentSlot.MAIN_HAND, WeaponClass.DAGGER
+        if any(x in name_lower for x in ["щит", "shield"]):
+            return ItemType.WEAPON, EquipmentSlot.OFF_HAND, WeaponClass.SHIELD
+
+        # БРОНЯ
+        if any(x in name_lower for x in ["шолом", "капелюх", "шлем", "helmet", "hat", "hood"]):
+            return ItemType.ARMOR, EquipmentSlot.HEAD, WeaponClass.NONE
+        if any(x in name_lower for x in ["обладунок", "тіло", "куртка", "сорочка", "armor", "chest", "body", "shirt"]):
+            return ItemType.ARMOR, EquipmentSlot.BODY, WeaponClass.NONE
+        if any(x in name_lower for x in ["штани", "поножі", "legs", "pants"]):
+            return ItemType.ARMOR, EquipmentSlot.LEGS, WeaponClass.NONE
+        if any(x in name_lower for x in ["взуття", "черевики", "чоботи", "boots", "shoes", "feets"]):
+            return ItemType.ARMOR, EquipmentSlot.FEET, WeaponClass.NONE
+        if any(x in name_lower for x in ["рукавиці", "перчатки", "hands", "gloves"]):
+            return ItemType.ARMOR, EquipmentSlot.HANDS, WeaponClass.NONE
+
+        # Дефолт (якщо не вгадали - нехай буде просто мотлох або зброя)
+        return ItemType.WEAPON, EquipmentSlot.MAIN_HAND, WeaponClass.NONE
+
+    # --- Inventory (Без змін) ---
     def add_item_to_inventory(self, hero_id: str, item: Item):
         conn = self._get_connection()
         inv_id = uuid.uuid4()
@@ -217,7 +239,6 @@ class StorageService:
 
         inventory = []
         for row in rows:
-            # row indexes: 0=inv_id, 1=equipped, 2=lib_id, 3=name, 4=type, 5=slot, 6=w_class, 7=w_hand, 8=dmg_type ...
             item_type = next((t for t in ItemType if t.value == row[4]), None)
             slot = next((s for s in EquipmentSlot if s.value == row[5]), None)
             w_class = next((w for w in WeaponClass if w.value == row[6]), WeaponClass.NONE)
@@ -235,12 +256,10 @@ class StorageService:
 
     def equip_item(self, hero_id: str, inventory_id: uuid.UUID, slot_value: str):
         conn = self._get_connection()
-        # Знімаємо старе в цьому слоті
         conn.execute("""
             UPDATE inventory SET is_equipped = 0 
             WHERE hero_id = ? AND is_equipped = 1 AND item_id IN (SELECT id FROM items_library WHERE slot = ?)
         """, (hero_id, slot_value))
-        # Вдягаємо нове
         conn.execute("UPDATE inventory SET is_equipped = 1 WHERE id = ?", (str(inventory_id),))
         conn.commit()
         conn.close()
@@ -273,6 +292,9 @@ class StorageService:
             )
             items.append(item)
         return items
+
+    # ... (Тут мають бути всі інші методи: create_hero, update_hero, save_goal тощо з попередньої версії) ...
+    # (Скопіюйте їх, щоб файл був повним, або просто замініть seed_items та init_db у вашому файлі)
 
     # --- Auth & Hero ---
     def create_hero(self, hero: Hero):
@@ -312,7 +334,6 @@ class StorageService:
         conn.close()
         return self._map_row_to_hero(row) if row else None
 
-    # --- ОСЬ ЦЕЙ МЕТОД БУВ ВІДСУТНІЙ І ВИКЛИКАВ ПОМИЛКУ ---
     def _map_row_to_hero(self, row) -> Hero:
         return Hero(
             id=uuid.UUID(row[0]),
