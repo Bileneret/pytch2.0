@@ -21,6 +21,8 @@ from src.ui.middle_panel import MiddlePanel
 from src.ui.enemy_panel import EnemyWidget
 from src.ui.cards import QuestCard, HabitCard
 
+from src.ui.skills_dialog import SkillsDialog
+
 
 class MainWindow(QMainWindow):
     logout_signal = pyqtSignal()
@@ -96,6 +98,30 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.tab_longterm, "📅 Звички")
 
         self.root_layout.addWidget(self.tabs)
+
+        self.middle_panel.skills_clicked.connect(self.open_skills_dialog)  # Підключення вікна
+        self.middle_panel.skill_used_signal.connect(self.use_skill)  # Підключення кнопок
+
+    def open_skills_dialog(self):
+        try:
+            SkillsDialog(self, self.service).exec_()
+        except Exception as e:
+            print(e)
+
+    def use_skill(self, skill_id):
+        """Використання навички з MiddlePanel."""
+        try:
+            msg = self.service.use_skill(skill_id)
+            self.refresh_data()  # Оновити ману/HP/ворога
+
+            # Можна показувати msg у статус-барі або спливаючому вікні,
+            # але щоб не спамити, можна просто виводити в консоль або зробити кастомний тост
+            QMessageBox.information(self, "Навичка", msg)
+
+        except ValueError as e:
+            QMessageBox.warning(self, "Неможливо", str(e))
+        except Exception as e:
+            print(f"Skill Error: {e}")
 
     def create_tab_controls(self, layout, btn_text, btn_command):
         box = QHBoxLayout()

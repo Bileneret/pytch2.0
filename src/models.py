@@ -140,6 +140,9 @@ class Hero:
 
     base_damage: int = 15
 
+    # НОВЕ: Множник наступної атаки (для Skill 4)
+    buff_multiplier: float = 1.0
+
     last_login: datetime = field(default_factory=datetime.now)
 
     def update_derived_stats(self):

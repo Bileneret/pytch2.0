@@ -14,10 +14,7 @@ def get_project_root():
 class HeroPanel(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
-
-        # --- ЖОРСТКА ФІКСАЦІЯ РОЗМІРІВ ---
-        self.setFixedSize(200, 300)
-
+        self.setFixedSize(200, 400)
         self.setStyleSheet("""
             QFrame {
                 background-color: #2c3e50; 
@@ -30,12 +27,12 @@ class HeroPanel(QFrame):
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setAlignment(Qt.AlignTop)  # Притискаємо контент до верху
+        layout.setAlignment(Qt.AlignTop)
         layout.setContentsMargins(15, 15, 15, 15)
         layout.setSpacing(5)
 
         # 1. Заголовок
-        lbl_title = QLabel("HERO")
+        lbl_title = QLabel("HERO STATUS")
         lbl_title.setAlignment(Qt.AlignCenter)
         lbl_title.setStyleSheet("color: #2ecc71; font-weight: bold; font-size: 10px;")
         layout.addWidget(lbl_title)
@@ -59,7 +56,7 @@ class HeroPanel(QFrame):
         self.lbl_class_level.setStyleSheet("font-weight: bold; font-size: 11px; color: #bdc3c7;")
         layout.addWidget(self.lbl_class_level)
 
-        # 5. Валюта та Стрік
+        # 5. Валюта
         stats_line = QHBoxLayout()
         self.lbl_gold = QLabel("💰 0")
         self.lbl_gold.setStyleSheet("font-weight: bold; color: #f1c40f;")
@@ -81,7 +78,18 @@ class HeroPanel(QFrame):
         """)
         layout.addWidget(self.hp_bar)
 
-        # 7. XP Bar
+        # 7. MANA BAR (НОВЕ)
+        self.mana_bar = QProgressBar()
+        self.mana_bar.setFixedHeight(10)
+        self.mana_bar.setTextVisible(True)
+        self.mana_bar.setAlignment(Qt.AlignCenter)
+        self.mana_bar.setStyleSheet("""
+            QProgressBar { border: 1px solid #7f8c8d; border-radius: 3px; background-color: #34495e; text-align: center; color: white; font-size: 8px; }
+            QProgressBar::chunk { background-color: #3498db; border-radius: 2px; }
+        """)
+        layout.addWidget(self.mana_bar)
+
+        # 8. XP Bar
         self.xp_bar = QProgressBar()
         self.xp_bar.setFixedHeight(15)
         self.xp_bar.setTextVisible(True)
@@ -95,6 +103,7 @@ class HeroPanel(QFrame):
         layout.addStretch()
 
     def update_data(self, hero):
+        # Avatar ... (без змін)
         self.lbl_avatar.setText("🧙‍♂️")
         self.lbl_avatar.setStyleSheet("font-size: 60px; background: transparent;")
         if hero.appearance and "assets" in hero.appearance:
@@ -108,9 +117,16 @@ class HeroPanel(QFrame):
 
         self.lbl_nickname.setText(hero.nickname)
         self.lbl_class_level.setText(f"Lvl {hero.level} | {hero.hero_class.value}")
+
         self.hp_bar.setMaximum(hero.max_hp)
         self.hp_bar.setValue(hero.hp)
         self.hp_bar.setFormat(f"{hero.hp}/{hero.max_hp}")
+
+        # Оновлення Мани
+        self.mana_bar.setMaximum(hero.max_mana)
+        self.mana_bar.setValue(hero.mana)
+        self.mana_bar.setFormat(f"{hero.mana}/{hero.max_mana}")
+
         self.xp_bar.setMaximum(hero.xp_to_next_level)
         self.xp_bar.setValue(hero.current_xp)
         self.xp_bar.setFormat(f"{hero.current_xp}/{hero.xp_to_next_level} XP")

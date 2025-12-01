@@ -31,32 +31,33 @@ class StorageService:
         conn = self._get_connection()
         cursor = conn.cursor()
 
-        # Heroes
+        # Heroes (ДОДАНО buff_multiplier)
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS heroes (
-                id TEXT PRIMARY KEY,
-                nickname TEXT UNIQUE NOT NULL,
-                hero_class TEXT,
-                gender TEXT,
-                appearance TEXT,
-                level INTEGER DEFAULT 1,
-                current_xp INTEGER DEFAULT 0,
-                xp_to_next_level INTEGER DEFAULT 100,
-                gold INTEGER DEFAULT 0,
-                streak_days INTEGER DEFAULT 0,
-                hp INTEGER DEFAULT 100,
-                max_hp INTEGER DEFAULT 100,
-                stat_points INTEGER DEFAULT 0,
-                str_stat INTEGER DEFAULT 0,
-                int_stat INTEGER DEFAULT 0,
-                dex_stat INTEGER DEFAULT 0,
-                vit_stat INTEGER DEFAULT 0,
-                def_stat INTEGER DEFAULT 0,
-                mana INTEGER DEFAULT 10,
-                max_mana INTEGER DEFAULT 10,
-                last_login TEXT
-            )
-        """)
+                    CREATE TABLE IF NOT EXISTS heroes (
+                        id TEXT PRIMARY KEY,
+                        nickname TEXT UNIQUE NOT NULL,
+                        hero_class TEXT,
+                        gender TEXT,
+                        appearance TEXT,
+                        level INTEGER DEFAULT 1,
+                        current_xp INTEGER DEFAULT 0,
+                        xp_to_next_level INTEGER DEFAULT 100,
+                        gold INTEGER DEFAULT 0,
+                        streak_days INTEGER DEFAULT 0,
+                        hp INTEGER DEFAULT 100,
+                        max_hp INTEGER DEFAULT 100,
+                        stat_points INTEGER DEFAULT 0,
+                        str_stat INTEGER DEFAULT 0,
+                        int_stat INTEGER DEFAULT 0,
+                        dex_stat INTEGER DEFAULT 0,
+                        vit_stat INTEGER DEFAULT 0,
+                        def_stat INTEGER DEFAULT 0,
+                        mana INTEGER DEFAULT 10,
+                        max_mana INTEGER DEFAULT 10,
+                        buff_multiplier REAL DEFAULT 1.0,
+                        last_login TEXT
+                    )
+                """)
 
         # Goals
         cursor.execute("""
@@ -273,11 +274,18 @@ class StorageService:
     def create_hero(self, hero: Hero):
         conn = self._get_connection()
         try:
-            conn.execute(
-                "INSERT INTO heroes (id, nickname, hero_class, gender, appearance, level, hp, max_hp, last_login, stat_points, str_stat, int_stat, dex_stat, vit_stat, def_stat, mana, max_mana) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (str(hero.id), hero.nickname, hero.hero_class.value, hero.gender.value, hero.appearance, hero.level,
-                 hero.hp, hero.max_hp, hero.last_login.isoformat(), hero.stat_points, hero.str_stat, hero.int_stat,
-                 hero.dex_stat, hero.vit_stat, hero.def_stat, hero.mana, hero.max_mana))
+            conn.execute("""
+                INSERT INTO heroes (
+                    id, nickname, hero_class, gender, appearance, level, hp, max_hp, last_login,
+                    stat_points, str_stat, int_stat, dex_stat, vit_stat, def_stat, mana, max_mana, buff_multiplier
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                str(hero.id), hero.nickname, hero.hero_class.value, hero.gender.value,
+                hero.appearance, hero.level, hero.hp, hero.max_hp, hero.last_login.isoformat(),
+                hero.stat_points, hero.str_stat, hero.int_stat, hero.dex_stat,
+                hero.vit_stat, hero.def_stat, hero.mana, hero.max_mana, hero.buff_multiplier
+            ))
             conn.commit()
         except sqlite3.IntegrityError:
             raise ValueError("Цей нікнейм вже зайнятий!")
@@ -301,19 +309,29 @@ class StorageService:
         return self._map_row_to_hero(row) if row else None
 
     def _map_row_to_hero(self, row) -> Hero:
-        return Hero(id=uuid.UUID(row[0]), nickname=row[1], hero_class=HeroClass(row[2]), gender=Gender(row[3]),
-                    appearance=row[4], level=row[5], current_xp=row[6], xp_to_next_level=row[7], gold=row[8],
-                    streak_days=row[9], hp=row[10], max_hp=row[11], stat_points=row[12], str_stat=row[13],
-                    int_stat=row[14], dex_stat=row[15], vit_stat=row[16], def_stat=row[17], mana=row[18],
-                    max_mana=row[19], last_login=datetime.fromisoformat(row[20]))
+        return Hero(
+            id=uuid.UUID(row[0]), nickname=row[1], hero_class=HeroClass(row[2]), gender=Gender(row[3]), appearance=row[4],
+            level=row[5], current_xp=row[6], xp_to_next_level=row[7], gold=row[8], streak_days=row[9], hp=row[10], max_hp=row[11],
+            stat_points=row[12], str_stat=row[13], int_stat=row[14], dex_stat=row[15],
+            vit_stat=row[16], def_stat=row[17], mana=row[18], max_mana=row[19],
+            buff_multiplier=row[20], # Нове поле
+            last_login=datetime.fromisoformat(row[21])
+        )
 
     def update_hero(self, hero: Hero):
         conn = self._get_connection()
-        conn.execute(
-            "UPDATE heroes SET level=?, current_xp=?, xp_to_next_level=?, gold=?, streak_days=?, hp=?, max_hp=?, last_login=?, stat_points=?, str_stat=?, int_stat=?, dex_stat=?, vit_stat=?, def_stat=?, mana=?, max_mana=? WHERE id=?",
-            (hero.level, hero.current_xp, hero.xp_to_next_level, hero.gold, hero.streak_days, hero.hp, hero.max_hp,
-             hero.last_login.isoformat(), hero.stat_points, hero.str_stat, hero.int_stat, hero.dex_stat, hero.vit_stat,
-             hero.def_stat, hero.mana, hero.max_mana, str(hero.id)))
+        conn.execute("""
+            UPDATE heroes SET 
+                level=?, current_xp=?, xp_to_next_level=?, gold=?, streak_days=?, hp=?, max_hp=?, last_login=?,
+                stat_points=?, str_stat=?, int_stat=?, dex_stat=?, vit_stat=?, def_stat=?, mana=?, max_mana=?, buff_multiplier=?
+            WHERE id=?
+        """, (
+            hero.level, hero.current_xp, hero.xp_to_next_level, hero.gold, hero.streak_days,
+            hero.hp, hero.max_hp, hero.last_login.isoformat(),
+            hero.stat_points, hero.str_stat, hero.int_stat, hero.dex_stat,
+            hero.vit_stat, hero.def_stat, hero.mana, hero.max_mana, hero.buff_multiplier,
+            str(hero.id)
+        ))
         conn.commit()
         conn.close()
 
@@ -426,3 +444,5 @@ class StorageService:
         conn.execute("DELETE FROM current_enemies WHERE hero_id = ?", (hero_id,))
         conn.commit()
         conn.close()
+
+    
