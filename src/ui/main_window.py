@@ -1,5 +1,3 @@
-import os
-import sys
 from datetime import datetime, timedelta
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -8,9 +6,11 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 
 from src.logic import GoalService
+from src.models import Goal, Difficulty, LongTermGoal
 from src.ui.dialogs import AddGoalDialog
 from src.ui.longterm_dialog import AddLongTermDialog
 from src.ui.stats_dialog import StatsDialog
+from src.ui.inventory_dialog import InventoryDialog  # <--- НОВИЙ ІМПОРТ
 
 # Імпорт панелей
 from src.ui.hero_panel import HeroPanel
@@ -25,7 +25,6 @@ class MainWindow(QMainWindow):
     def __init__(self, service: GoalService):
         super().__init__()
         self.service = service
-        # Зміщення часу для тестування
         self.time_offset = timedelta(0)
 
         self.setWindowTitle("Learning Goals RPG 🛡️")
@@ -35,14 +34,12 @@ class MainWindow(QMainWindow):
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
 
-        # Головний леаут (Вертикальний)
         self.root_layout = QVBoxLayout(self.central_widget)
         self.root_layout.setContentsMargins(10, 10, 10, 10)
         self.root_layout.setSpacing(15)
 
         self.setup_ui()
 
-        # Таймер
         self.main_timer = QTimer(self)
         self.main_timer.timeout.connect(self.on_tick)
         self.main_timer.start(1000)
@@ -50,7 +47,7 @@ class MainWindow(QMainWindow):
         self.refresh_data()
 
     def setup_ui(self):
-        # 1. ВЕРХНЯ СЕКЦІЯ (3 Панелі)
+        # 1. ВЕРХНЯ СЕКЦІЯ
         top_container = QWidget()
         top_layout = QHBoxLayout(top_container)
         top_layout.setContentsMargins(0, 0, 0, 0)
@@ -61,7 +58,9 @@ class MainWindow(QMainWindow):
         top_layout.addWidget(self.hero_panel)
 
         self.middle_panel = MiddlePanel()
+        # Підключення сигналів
         self.middle_panel.stats_clicked.connect(self.open_stats_dialog)
+        self.middle_panel.inventory_clicked.connect(self.open_inventory)  # <--- НОВЕ ПІДКЛЮЧЕННЯ
         self.middle_panel.logout_clicked.connect(self.on_logout)
         self.middle_panel.debug_time_clicked.connect(self.on_debug_add_time)
         top_layout.addWidget(self.middle_panel)
@@ -79,7 +78,6 @@ class MainWindow(QMainWindow):
             QTabBar::tab:selected { background: white; color: #2980b9; border-top: 3px solid #3498db; }
         """)
 
-        # Tab 1: Квести
         self.tab_quests = QWidget()
         l1 = QVBoxLayout(self.tab_quests)
         l1.setContentsMargins(0, 10, 0, 0)
@@ -87,7 +85,6 @@ class MainWindow(QMainWindow):
         self.quest_list_layout = self.create_scroll_area(l1)
         self.tabs.addTab(self.tab_quests, "⚔️ Квести")
 
-        # Tab 2: Звички
         self.tab_longterm = QWidget()
         l2 = QVBoxLayout(self.tab_longterm)
         l2.setContentsMargins(0, 10, 0, 0)
@@ -159,27 +156,19 @@ class MainWindow(QMainWindow):
             print(f"Error checking deadlines: {e}")
 
     def refresh_data(self):
-        # --- ЗАПОБІЖНИК ВІД ПОМИЛОК ОНОВЛЕННЯ ---
         try:
-            # Панелі
-            try:
-                hero = self.service.get_hero()
-                enemy = self.service.get_current_enemy()
-                simulated_now = datetime.now() + self.time_offset
+            hero = self.service.get_hero()
+            enemy = self.service.get_current_enemy()
+            simulated_now = datetime.now() + self.time_offset
 
-                self.hero_panel.update_data(hero)
-                self.middle_panel.update_data(hero, simulated_now)
-                self.enemy_widget.update_enemy(enemy)
-            except ValueError:
-                pass  # Ігноруємо, якщо немає сесії
+            self.hero_panel.update_data(hero)
+            self.middle_panel.update_data(hero, simulated_now)
+            self.enemy_widget.update_enemy(enemy)
+        except ValueError:
+            pass
 
-            # Списки
-            self.update_quest_list()
-            self.update_habit_list()
-
-        except Exception as e:
-            print(f"Refresh Error: {e}")
-            # Не показуємо вікно, щоб не спамити, але пишемо в консоль
+        self.update_quest_list()
+        self.update_habit_list()
 
     def update_quest_list(self):
         while self.quest_list_layout.count():
@@ -221,7 +210,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.longterm_list_layout.addWidget(QLabel(f"Помилка завантаження: {e}", styleSheet="color: red;"))
 
-    # --- ACTIONS WITH ERROR HANDLING ---
+    # --- ACTIONS ---
     def on_add_goal(self):
         if AddGoalDialog(self, self.service).exec_(): self.refresh_data()
 
@@ -269,6 +258,14 @@ class MainWindow(QMainWindow):
             self.refresh_data()
         except Exception as e:
             QMessageBox.critical(self, "Помилка", f"Не вдалося відкрити характеристики:\n{str(e)}")
+
+    def open_inventory(self):
+        """Відкриває інвентар."""
+        try:
+            InventoryDialog(self, self.service).exec_()
+            self.refresh_data()  # Оновлюємо, бо могли вдягнути речі і змінити стати
+        except Exception as e:
+            QMessageBox.critical(self, "Помилка", f"Не вдалося відкрити інвентар:\n{str(e)}")
 
     def on_logout(self):
         reply = QMessageBox.question(self, 'Вихід', "Вийти з акаунту?", QMessageBox.Yes | QMessageBox.No)
