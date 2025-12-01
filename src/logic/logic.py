@@ -2,18 +2,12 @@ from typing import List, Tuple, Optional
 from datetime import datetime, timedelta
 import random
 
-from .models import Goal, Hero, Difficulty, LongTermGoal, HeroClass, Gender, Enemy, DamageType
-from .storage import StorageService
-from .longterm_mechanics import LongTermManager
-from .session import SessionManager
-from .enemy_mechanics import EnemyGenerator
-
-# Імпорт міксинів
+# Імпорт міксинів (з поточної папки - одна крапка)
 from .hero_logic import HeroLogic
 from .combat_logic import CombatLogic
 from .quest_logic import QuestLogic
 from .habit_logic import HabitLogic
-from .item_logic import ItemLogic  # <--- ВАЖЛИВО: Імпорт ItemLogic
+from .item_logic import ItemLogic
 
 class ValidationUtils:
     """
