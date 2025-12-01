@@ -112,6 +112,18 @@ class InventoryDialog(QDialog):
 
         self.refresh_ui()
 
+        # DEBUG BUTTON
+        btn_debug_add = QPushButton("🎁 Отримати тестові речі")
+        btn_debug_add.clicked.connect(self.add_test_items)
+        self.right_layout.addWidget(btn_debug_add)
+
+        self.refresh_ui()
+
+    def add_test_items(self):
+        self.service.give_test_items()
+        self.refresh_ui()
+        QMessageBox.information(self, "Інвентар", "Предмети додано!")
+
     def refresh_ui(self):
         """Оновлює списки предметів та слоти."""
         # 1. Очищаємо список предметів

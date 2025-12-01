@@ -37,21 +37,34 @@ class DamageType(Enum):
     MAGICAL = "Магічний"
 
 
-# --- НОВЕ: Інвентар та Спорядження ---
+# --- Inventory & Equipment ---
 class ItemType(Enum):
     WEAPON = "Зброя"
     ARMOR = "Броня"
-    # Можна додати POTION, SCROLL в майбутньому
 
 
 class EquipmentSlot(Enum):
-    HEAD = "Голова"  # Шолом
-    BODY = "Тіло"  # Обладунок
-    LEGS = "Ноги"  # Штани/Поножі
-    FEET = "Взуття"  # Черевики
-    HANDS = "Руки"  # Рукавички
-    MAIN_HAND = "Права рука"  # Зброя
-    OFF_HAND = "Ліва рука"  # Щит або друга зброя
+    HEAD = "Голова"  # +INT
+    BODY = "Тіло"  # +HP (more), +DEF (less)
+    LEGS = "Ноги"  # +HP (less), +DEF (more)
+    FEET = "Взуття"  # +DEX
+    HANDS = "Руки"  # +STR (Gloves)
+    MAIN_HAND = "Права рука"
+    OFF_HAND = "Ліва рука"
+
+
+class WeaponClass(Enum):
+    SWORD = "Меч"  # Воїн (Bleed chance)
+    BOW = "Лук"  # Лучник (Crit x2 chance)
+    STAFF = "Посох"  # Маг (Spell chance)
+    DAGGER = "Кинджал"  # Розбійник (Parry chance)
+    SHIELD = "Щит"  # Будь-хто (Defense)
+    NONE = "Немає"
+
+
+class WeaponHandType(Enum):
+    ONE_HANDED = "Одноручне"
+    TWO_HANDED = "Дворучне"
 
 
 # --- Models ---
@@ -60,17 +73,24 @@ class Item:
     """Модель предмета (шаблон)."""
     name: str
     item_type: ItemType
-    slot: Optional[EquipmentSlot]  # None, якщо це просто мотлох
+    slot: Optional[EquipmentSlot]
 
-    # Бонуси
+    # Характеристики предмета
+    weapon_class: WeaponClass = WeaponClass.NONE
+    weapon_hands: WeaponHandType = WeaponHandType.ONE_HANDED
+    damage_type: DamageType = DamageType.PHYSICAL
+
+    # Бонуси (+1, +2 і т.д.)
     bonus_str: int = 0
     bonus_int: int = 0
     bonus_dex: int = 0
     bonus_vit: int = 0
     bonus_def: int = 0
+    base_dmg: int = 0  # Базовий урон зброї
 
     price: int = 0
-    image_path: str = ""  # Шлях до іконки
+    level: int = 1
+    image_path: str = ""
 
     id: uuid.UUID = field(default_factory=uuid.uuid4)
 
@@ -80,7 +100,7 @@ class InventoryItem:
     """Конкретний предмет у інвентарі героя."""
     item: Item
     is_equipped: bool = False
-    id: uuid.UUID = field(default_factory=uuid.uuid4)  # Унікальний ID екземпляра
+    id: uuid.UUID = field(default_factory=uuid.uuid4)
 
 
 @dataclass
@@ -99,7 +119,7 @@ class Hero:
     hp: int = 100
     max_hp: int = 100
 
-    # Характеристики (Базові)
+    # Характеристики
     stat_points: int = 0
     str_stat: int = 0
     int_stat: int = 0
@@ -115,7 +135,6 @@ class Hero:
     last_login: datetime = field(default_factory=datetime.now)
 
     def update_derived_stats(self):
-        """Оновлює HP та Ману на основі статів."""
         self.max_hp = 100 + (self.vit_stat * 5)
         self.max_mana = 10 + (self.int_stat * 5)
 
