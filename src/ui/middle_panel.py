@@ -25,7 +25,7 @@ class MiddlePanel(QFrame):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedHeight(300)
+        self.setFixedHeight(350)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.setup_ui()
 

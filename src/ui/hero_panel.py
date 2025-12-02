@@ -14,7 +14,7 @@ def get_project_root():
 class HeroPanel(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedSize(200, 300)
+        self.setFixedSize(200, 350)
         self.setStyleSheet("""
             QFrame {
                 background-color: #2c3e50; 
@@ -39,7 +39,7 @@ class HeroPanel(QFrame):
 
         # 2. Аватар
         self.lbl_avatar = QLabel("🧙‍♂️")
-        self.lbl_avatar.setFixedSize(100, 100)
+        self.lbl_avatar.setFixedSize(150, 150)
         self.lbl_avatar.setAlignment(Qt.AlignCenter)
         self.lbl_avatar.setStyleSheet("font-size: 60px;")
         layout.addWidget(self.lbl_avatar, 0, Qt.AlignHCenter)
@@ -80,11 +80,11 @@ class HeroPanel(QFrame):
 
         # 7. MANA BAR (НОВЕ)
         self.mana_bar = QProgressBar()
-        self.mana_bar.setFixedHeight(10)
+        self.mana_bar.setFixedHeight(15)
         self.mana_bar.setTextVisible(True)
         self.mana_bar.setAlignment(Qt.AlignCenter)
         self.mana_bar.setStyleSheet("""
-            QProgressBar { border: 1px solid #7f8c8d; border-radius: 3px; background-color: #34495e; text-align: center; color: white; font-size: 8px; }
+            QProgressBar { border: 1px solid #7f8c8d; border-radius: 5px; background-color: #34495e; text-align: center; color: white; font-size: 10px; }
             QProgressBar::chunk { background-color: #3498db; border-radius: 2px; }
         """)
         layout.addWidget(self.mana_bar)
