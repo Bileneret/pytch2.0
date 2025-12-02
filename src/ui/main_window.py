@@ -324,9 +324,9 @@ class MainWindow(QMainWindow):
 
             if self.quest_sort_combo:
                 mode = self.quest_sort_combo.currentText()
-                if "Дедлайн (спочатку нові)" in mode:
+                if "Дедлайн (спочатку старі)" in mode:
                     goals.sort(key=lambda x: (x.is_completed, x.deadline))
-                elif "Дедлайн (спочатку старі)" in mode:
+                elif "Дедлайн (спочатку нові)" in mode:
                     goals.sort(key=lambda x: (x.is_completed, x.deadline), reverse=True)
                 elif "Пріоритет" in mode:
                     goals.sort(key=lambda x: (x.is_completed, -x.difficulty.value))
@@ -360,9 +360,9 @@ class MainWindow(QMainWindow):
 
             if self.habit_sort_combo:
                 mode = self.habit_sort_combo.currentText()
-                if "Дата старту (нові)" in mode:
+                if "Дата старту (старі)" in mode:
                     lt_goals.sort(key=lambda x: (x.is_completed, x.start_date), reverse=True)
-                elif "Дата старту (старі)" in mode:
+                elif "Дата старту (нові)" in mode:
                     lt_goals.sort(key=lambda x: (x.is_completed, x.start_date))
                 elif "Прогрес (більше)" in mode:
                     lt_goals.sort(key=lambda x: (x.is_completed, -x.calculate_progress()))
