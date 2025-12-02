@@ -71,7 +71,7 @@ class StorageService:
         cursor.execute(
             "CREATE TABLE IF NOT EXISTS current_enemies (hero_id TEXT PRIMARY KEY, id TEXT NOT NULL, name TEXT, rarity TEXT, level INTEGER, current_hp INTEGER, max_hp INTEGER, damage INTEGER, damage_type TEXT, reward_xp INTEGER, reward_gold INTEGER, drop_chance REAL, image_path TEXT, FOREIGN KEY (hero_id) REFERENCES heroes (id) ON DELETE CASCADE)")
 
-        # Items Library - ОНОВЛЕНО: Додано double_attack_chance
+        # Items Library
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS items_library (
                 id TEXT PRIMARY KEY,
@@ -94,11 +94,11 @@ class StorageService:
             )
         """)
 
-        # Спроба додати колонку, якщо вона відсутня (для існуючих БД)
+        # Спроба додати колонку, якщо вона відсутня
         try:
             cursor.execute("ALTER TABLE items_library ADD COLUMN double_attack_chance INTEGER DEFAULT 0")
         except sqlite3.OperationalError:
-            pass  # Колонка вже існує
+            pass
 
         # Inventory
         cursor.execute("""
@@ -118,9 +118,7 @@ class StorageService:
     def seed_items_from_folder(self):
         """
         Сканує папку assets/items.
-        Парсер оновлено для підтримки двох форматів:
-        1. 6 чисел: Name_STR_INT_DEX_VIT_DEF_DoubleAttackChance.png (Кинджали)
-        2. 5 чисел: Name_STR_INT_DEX_VIT_DEF.png (Інше)
+        Виправлено логіку для щитів та оновлення існуючих предметів.
         """
         base_path = get_project_root()
         items_path = os.path.join(base_path, "assets", "items")
@@ -137,7 +135,6 @@ class StorageService:
         pattern_5 = re.compile(r"^(.*)_(\d+)_(\d+)_(\d+)_(\d+)_(\d+)\.png$", re.IGNORECASE)
 
         for filename in files:
-            # Спробуємо спочатку 6 чисел (специфічніше)
             match = pattern_6.match(filename)
             double_attack = 0
 
@@ -148,9 +145,8 @@ class StorageService:
                 dex_val = int(match.group(4))
                 vit_val = int(match.group(5))
                 def_val = int(match.group(6))
-                double_attack = int(match.group(7))  # Останнє число - шанс подвійної атаки
+                double_attack = int(match.group(7))
             else:
-                # Якщо не вийшло, пробуємо 5 чисел
                 match = pattern_5.match(filename)
                 if match:
                     raw_name = match.group(1)
@@ -160,13 +156,13 @@ class StorageService:
                     vit_val = int(match.group(5))
                     def_val = int(match.group(6))
                 else:
-                    continue  # Пропускаємо файли, що не відповідають формату
+                    continue
 
             clean_name = raw_name.replace("_", " ")
             item_type, slot, w_class = self._guess_item_type_and_slot(clean_name)
 
             # --- РОЗРАХУНОК ЦІНИ ---
-            price = 250  # Base
+            price = 250
             lower = clean_name.lower()
             if "заліз" in lower or "iron" in lower:
                 price = 750
@@ -181,12 +177,16 @@ class StorageService:
 
             base_dmg = 0
             if item_type == ItemType.WEAPON:
-                base_dmg = max(str_val, int_val, dex_val) * 2
-                if base_dmg == 0: base_dmg = 5
+                # ВИПРАВЛЕННЯ: Щити не повинні мати базового урону
+                if w_class == WeaponClass.SHIELD:
+                    base_dmg = 0
+                else:
+                    base_dmg = max(str_val, int_val, dex_val) * 2
+                    if base_dmg == 0: base_dmg = 5
 
             try:
                 item_id = str(uuid.uuid4())
-                # Оновлений запит INSERT з double_attack_chance
+                # Спробуємо вставити новий
                 cursor.execute("""
                     INSERT OR IGNORE INTO items_library (
                         id, name, item_type, slot, weapon_class, weapon_hands, damage_type,
@@ -199,6 +199,16 @@ class StorageService:
                     str_val, int_val, dex_val, vit_val, def_val, base_dmg,
                     double_attack, price, 1, filename
                 ))
+
+                # ОНОВЛЕННЯ: Примусово оновлюємо характеристики існуючих предметів
+                # Це виправить щити без перестворення бази
+                cursor.execute("""
+                    UPDATE items_library 
+                    SET base_dmg = ?, double_attack_chance = ?, 
+                        bonus_str = ?, bonus_int = ?, bonus_dex = ?, bonus_vit = ?, bonus_def = ?
+                    WHERE image_path = ?
+                """, (base_dmg, double_attack, str_val, int_val, dex_val, vit_val, def_val, filename))
+
             except Exception as e:
                 print(f"Error adding item {filename}: {e}")
 
@@ -206,7 +216,6 @@ class StorageService:
         conn.close()
 
     def _guess_item_type_and_slot(self, name: str):
-        # ... (цей метод залишається без змін)
         name_lower = name.lower()
         if any(x in name_lower for x in
                ["меч", "sword", "клинок"]): return ItemType.WEAPON, EquipmentSlot.MAIN_HAND, WeaponClass.SWORD
@@ -251,11 +260,6 @@ class StorageService:
         conn.close()
         inventory = []
         for row in rows:
-            # row structure changed due to new column in items_library. Need to map correctly.
-            # inv.id(0), inv.is_equipped(1), lib.id(2), lib.name(3), lib.item_type(4), lib.slot(5),
-            # w_class(6), w_hands(7), dmg_type(8), str(9), int(10), dex(11), vit(12), def(13), base_dmg(14),
-            # double_attack(15), price(16), level(17), image(18)
-
             item_type = next((t for t in ItemType if t.value == row[4]), None)
             slot = next((s for s in EquipmentSlot if s.value == row[5]), None)
 
@@ -270,7 +274,7 @@ class StorageService:
                 bonus_vit=row[12],
                 bonus_def=row[13],
                 base_dmg=row[14],
-                double_attack_chance=row[15],  # <--- Зчитуємо шанс
+                double_attack_chance=row[15],
                 price=row[16],
                 level=row[17],
                 image_path=row[18]
@@ -301,7 +305,6 @@ class StorageService:
         conn.close()
         items = []
         for row in rows:
-            # Мапінг рядків такий самий як у get_inventory, але без перших двох полів з inventory
             item_type = next((t for t in ItemType if t.value == row[2]), None)
             slot = next((s for s in EquipmentSlot if s.value == row[3]), None)
             item = Item(
@@ -315,7 +318,7 @@ class StorageService:
                 bonus_vit=row[10],
                 bonus_def=row[11],
                 base_dmg=row[12],
-                double_attack_chance=row[13],  # <---
+                double_attack_chance=row[13],
                 price=row[14],
                 level=row[15],
                 image_path=row[16]
@@ -323,8 +326,6 @@ class StorageService:
             items.append(item)
         return items
 
-    # ... (Решта методів create_hero, update_hero, save_goal і т.д. залишаються без змін)
-    # Auth & Hero
     def create_hero(self, hero: Hero):
         conn = self._get_connection()
         try:
@@ -391,7 +392,6 @@ class StorageService:
         conn.commit()
         conn.close()
 
-    # Goals
     def save_goal(self, goal: Goal, hero_id: str):
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -440,7 +440,6 @@ class StorageService:
         conn.commit()
         conn.close()
 
-    # Long Term
     def save_long_term_goal(self, goal: LongTermGoal, hero_id: str):
         conn = self._get_connection()
         last_update = goal.last_update_date.isoformat() if goal.last_update_date else None
@@ -472,7 +471,6 @@ class StorageService:
         conn.close()
         return goals
 
-    # Enemies
     def save_enemy(self, enemy: Enemy, hero_id: str):
         conn = self._get_connection()
         conn.execute(
