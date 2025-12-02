@@ -59,13 +59,30 @@ class StorageService:
                     )
                 """)
 
-        # Goals
+        # Goals (з полем previous_state)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS goals (
-                id TEXT PRIMARY KEY, hero_id TEXT NOT NULL, title TEXT NOT NULL, description TEXT, deadline TEXT, difficulty INTEGER, created_at TEXT, is_completed INTEGER DEFAULT 0, penalty_applied INTEGER DEFAULT 0, FOREIGN KEY (hero_id) REFERENCES heroes (id) ON DELETE CASCADE)
+                id TEXT PRIMARY KEY, 
+                hero_id TEXT NOT NULL, 
+                title TEXT NOT NULL, 
+                description TEXT, 
+                deadline TEXT, 
+                difficulty INTEGER, 
+                created_at TEXT, 
+                is_completed INTEGER DEFAULT 0, 
+                penalty_applied INTEGER DEFAULT 0, 
+                previous_state TEXT DEFAULT '',
+                FOREIGN KEY (hero_id) REFERENCES heroes (id) ON DELETE CASCADE
+            )
         """)
 
-        # Sub Goals (оновлена структура з описом)
+        # Міграція для goals (якщо бази вже створені)
+        try:
+            cursor.execute("ALTER TABLE goals ADD COLUMN previous_state TEXT DEFAULT ''")
+        except sqlite3.OperationalError:
+            pass
+
+        # Sub Goals
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS sub_goals (
                 id TEXT PRIMARY KEY, 
@@ -77,7 +94,7 @@ class StorageService:
             )
         """)
 
-        # Міграція: Додаємо колонку description, якщо вона відсутня
+        # Міграція для sub_goals
         try:
             cursor.execute("ALTER TABLE sub_goals ADD COLUMN description TEXT DEFAULT ''")
         except sqlite3.OperationalError:
@@ -401,12 +418,13 @@ class StorageService:
         conn = self._get_connection()
         cursor = conn.cursor()
         try:
+            # Оновлено запит для збереження previous_state
             cursor.execute(
-                "INSERT OR REPLACE INTO goals (id, hero_id, title, description, deadline, difficulty, created_at, is_completed, penalty_applied) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT OR REPLACE INTO goals (id, hero_id, title, description, deadline, difficulty, created_at, is_completed, penalty_applied, previous_state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (str(goal.id), hero_id, goal.title, goal.description, goal.deadline.isoformat(), goal.difficulty.value,
-                 goal.created_at.isoformat(), 1 if goal.is_completed else 0, 1 if goal.penalty_applied else 0))
+                 goal.created_at.isoformat(), 1 if goal.is_completed else 0, 1 if goal.penalty_applied else 0,
+                 goal.previous_state))
 
-            # Оновлено збереження підцілей з описом
             cursor.execute("DELETE FROM sub_goals WHERE goal_id = ?", (str(goal.id),))
             for sub in goal.subgoals:
                 cursor.execute(
@@ -420,25 +438,24 @@ class StorageService:
         conn = self._get_connection()
         cursor = conn.cursor()
         goals_list = []
+        # Оновлено запит для завантаження previous_state
         cursor.execute(
-            "SELECT id, title, description, deadline, difficulty, created_at, is_completed, penalty_applied FROM goals WHERE hero_id = ?",
+            "SELECT id, title, description, deadline, difficulty, created_at, is_completed, penalty_applied, previous_state FROM goals WHERE hero_id = ?",
             (hero_id,))
         rows = cursor.fetchall()
         for row in rows:
-            g_id, title, desc, dl_str, diff_val, ca_str, is_comp, is_penalized = row
+            g_id, title, desc, dl_str, diff_val, ca_str, is_comp, is_penalized, prev_state = row
             goal = Goal(title=title, description=desc, deadline=datetime.fromisoformat(dl_str),
                         difficulty=Difficulty(diff_val))
             goal.id = uuid.UUID(g_id)
             goal.created_at = datetime.fromisoformat(ca_str)
             goal.is_completed = bool(is_comp)
             goal.penalty_applied = bool(is_penalized)
+            # prev_state може бути None у старих БД, тому ставимо ""
+            goal.previous_state = prev_state if prev_state else ""
 
-            # Оновлено завантаження підцілей (тепер з описом)
-            # Перевіряємо, чи є колонка description (для сумісності зі старими БД без міграції в момент запиту, хоча ми додали її в init)
-            # Але краще просто вибирати. Якщо стовпчика немає - init_db вже мав це виправити.
             cursor.execute("SELECT id, title, is_completed, description FROM sub_goals WHERE goal_id = ?", (g_id,))
             for s_row in cursor.fetchall():
-                # s_row[3] може бути None, якщо база стара і ми тільки додали стовпчик (хоча DEFAULT '' має допомогти)
                 description_val = s_row[3] if s_row[3] is not None else ""
                 sub = SubGoal(title=s_row[1], description=description_val)
                 sub.id = uuid.UUID(s_row[0])

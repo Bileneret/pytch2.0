@@ -161,7 +161,7 @@ class Enemy:
 @dataclass
 class SubGoal:
     title: str
-    description: str = ""  # <--- НОВЕ ПОЛЕ
+    description: str = ""
     is_completed: bool = False
     id: uuid.UUID = field(default_factory=uuid.uuid4)
 
@@ -181,6 +181,9 @@ class Goal:
     penalty_applied: bool = False
     id: uuid.UUID = field(default_factory=uuid.uuid4)
     subgoals: List[SubGoal] = field(default_factory=list)
+
+    # НОВЕ ПОЛЕ: для збереження стану героя перед виконанням (JSON string)
+    previous_state: str = ""
 
     def add_subgoal(self, subgoal: SubGoal):
         self.subgoals.append(subgoal)
