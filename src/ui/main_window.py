@@ -95,7 +95,7 @@ class MainWindow(QMainWindow):
             btn_text="➕ Новий Квест",
             btn_command=self.on_add_goal,
             refresh_command=self.refresh_data,
-            sort_items=["Дедлайн (спочатку старі)", "Дедлайн (спочатку нові)", "Пріоритет (Складність)", "Прогрес",
+            sort_items=["Дедлайн (спочатку нові)", "Дедлайн (спочатку старі)", "Пріоритет (Складність)", "Прогрес",
                         "Дата створення"],
             on_sort_change=self.update_quest_list,
             add_cleanup=True,
@@ -324,9 +324,9 @@ class MainWindow(QMainWindow):
 
             if self.quest_sort_combo:
                 mode = self.quest_sort_combo.currentText()
-                if "Дедлайн (спочатку старі)" in mode:
+                if "Дедлайн (спочатку нові)" in mode:
                     goals.sort(key=lambda x: (x.is_completed, x.deadline))
-                elif "Дедлайн (спочатку нові)" in mode:
+                elif "Дедлайн (спочатку старі)" in mode:
                     goals.sort(key=lambda x: (x.is_completed, x.deadline), reverse=True)
                 elif "Пріоритет" in mode:
                     goals.sort(key=lambda x: (x.is_completed, -x.difficulty.value))

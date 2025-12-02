@@ -25,15 +25,16 @@ class AIChatWorker(QThread):
 
 class ChatInputArea(QTextEdit):
     """
-    Кастомне поле вводу для чату.
-    Enter - відправити повідомлення.
-    Shift + Enter - перенос рядка.
+    Кастомне поле вводу для чату з авторозширенням.
+    Enter - відправити.
+    Shift + Enter - новий рядок + розширення висоти.
     """
     submit_request = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setPlaceholderText("Опишіть вашу ціль тут... (Shift+Enter для переносу)")
+
         self.setStyleSheet("""
             QTextEdit {
                 padding: 10px;
@@ -43,17 +44,36 @@ class ChatInputArea(QTextEdit):
                 color: white;
             }
         """)
-        self.setFixedHeight(60)  # Фіксована висота для компактності
+
+        # Налаштування розмірів
+        self.MIN_HEIGHT = 50  # ~1-2 рядки
+        self.MAX_HEIGHT = 180  # ~10 рядків
+
+        self.setFixedHeight(self.MIN_HEIGHT)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
+        self.textChanged.connect(self.adjust_height)
+
+    def adjust_height(self):
+        doc_height = self.document().size().height()
+        new_height = int(doc_height + 20)
+
+        if new_height > self.MAX_HEIGHT:
+            self.setFixedHeight(self.MAX_HEIGHT)
+            self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        elif new_height < self.MIN_HEIGHT:
+            self.setFixedHeight(self.MIN_HEIGHT)
+            self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        else:
+            self.setFixedHeight(new_height)
+            self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Return:
             if event.modifiers() & Qt.ShiftModifier:
-                # Shift + Enter -> Новий рядок (стандартна поведінка QTextEdit при натисканні Enter)
                 self.insertPlainText("\n")
             else:
-                # Enter (без Shift) -> Відправити
                 self.submit_request.emit()
-                # Блокуємо стандартну подію, щоб не вставився зайвий перенос рядка
                 return
         else:
             super().keyPressEvent(event)
@@ -70,7 +90,7 @@ class AIGoalDialog(QDialog):
         self.generated_goal_data = None  # Тут буде JSON, коли AI його видасть
 
         self.setWindowTitle("AI Помічник 🤖")
-        self.resize(500, 600)
+        self.resize(600, 700)
         self.setup_ui()
 
         # Запускаємо чат
@@ -95,9 +115,9 @@ class AIGoalDialog(QDialog):
         """)
         layout.addWidget(self.chat_area)
 
-        # 2. Індикатор завантаження (AI друкує...)
+        # 2. Індикатор завантаження
         self.loading_bar = QProgressBar()
-        self.loading_bar.setRange(0, 0)  # Нескінченна анімація
+        self.loading_bar.setRange(0, 0)
         self.loading_bar.setFixedHeight(3)
         self.loading_bar.setTextVisible(False)
         self.loading_bar.setStyleSheet(
@@ -105,7 +125,7 @@ class AIGoalDialog(QDialog):
         self.loading_bar.hide()
         layout.addWidget(self.loading_bar)
 
-        # 3. Поле вводу (Використовуємо кастомний клас)
+        # 3. Поле вводу
         input_layout = QHBoxLayout()
 
         self.input_field = ChatInputArea()
@@ -129,7 +149,6 @@ class AIGoalDialog(QDialog):
         """)
         self.btn_send.clicked.connect(self.send_message)
 
-        # Вирівнювання кнопки по низу (щоб була на рівні останнього рядка вводу)
         input_layout.addWidget(self.btn_send, 0, Qt.AlignBottom)
 
         layout.addLayout(input_layout)
@@ -166,7 +185,6 @@ class AIGoalDialog(QDialog):
             self.input_field.setEnabled(False)
 
     def send_message(self):
-        # Отримуємо текст через toPlainText() замість text()
         text = self.input_field.toPlainText().strip()
         if not text: return
 
@@ -194,28 +212,42 @@ class AIGoalDialog(QDialog):
             # Якщо AI надіслав JSON (ціль сформована)
             self.generated_goal_data = json_data
 
-            # Формуємо красиве повідомлення про успіх
+            # --- ФОРМУЄМО ДЕТАЛЬНИЙ ПЕРЕГЛЯД ---
+            subgoals_html = ""
+            for i, sub in enumerate(json_data.get('subgoals', []), 1):
+                subgoals_html += (
+                    f"<div style='margin-bottom: 5px; margin-left: 10px;'>"
+                    f"<b>{i}. {sub.get('title')}</b><br>"
+                    f"<span style='color: #aaaaaa; font-size: 11px;'>{sub.get('description')}</span>"
+                    f"</div>"
+                )
+
             summary = (
-                f"🎉 <b>План готовий!</b><br><br>"
-                f"<b>Назва:</b> {json_data.get('title')}<br>"
+                f"🎉 <b>План готовий! Перевірте деталі:</b><br><hr>"
+                f"<b>Назва:</b> <span style='font-size: 14px; color: #f1c40f;'>{json_data.get('title')}</span><br>"
+                f"<b>Опис:</b> {json_data.get('description')}<br>"
                 f"<b>Складність:</b> {json_data.get('difficulty')}<br>"
                 f"<b>Дедлайн через:</b> {json_data.get('deadline_days')} днів<br>"
-                f"<b>Підцілей:</b> {len(json_data.get('subgoals', []))}<br><br>"
-                f"Натисніть <b>'Додати Ціль'</b>, щоб зберегти."
+                f"<hr><b>📋 Підцілі:</b><br>{subgoals_html}<br><hr>"
+                f"<i>Якщо все вірно, натисніть кнопку внизу. Або напишіть, що виправити.</i>"
             )
+
             self.chat_area.append(summary)
             self.chat_area.verticalScrollBar().setValue(self.chat_area.verticalScrollBar().maximum())
 
+            # Вмикаємо кнопку додавання
             self.btn_add.setEnabled(True)
-            self.btn_add.setText(f"✅ Додати: {json_data.get('title')}")
-            self.input_field.setPlaceholderText("Ціль сформована. Натисніть Додати.")
-            self.input_field.setEnabled(False)
+            self.btn_add.setText(f"✅ Зберегти цю ціль")
+
+            # НЕ БЛОКУЄМО ввід, щоб можна було правити
+            self.input_field.setPlaceholderText("Напишіть сюди, якщо хочете щось змінити...")
+            self.input_field.setEnabled(True)
+            self.input_field.setFocus()
 
     def append_message(self, sender, text):
         color = "#3498db" if sender == "AI" else "#2ecc71"
         align = "left" if sender == "AI" else "right"
 
-        # Просте форматування HTML
         formatted_text = text.replace("\n", "<br>")
 
         msg_html = f"""
@@ -225,11 +257,9 @@ class AIGoalDialog(QDialog):
         </div>
         """
         self.chat_area.append(msg_html)
-        # Автопрокрутка вниз
         self.chat_area.verticalScrollBar().setValue(self.chat_area.verticalScrollBar().maximum())
 
     def finalize_goal(self):
-        """Створення цілі в системі на основі JSON від AI."""
         if not self.generated_goal_data: return
 
         try:

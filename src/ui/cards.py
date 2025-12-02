@@ -130,7 +130,8 @@ class QuestCard(QFrame):
             for sub in self.goal.subgoals:
                 cb = QCheckBox(sub.title)
                 cb.setChecked(sub.is_completed)
-                # Стиль чекбокса
+                # Стиль чекбокса: білий текст, трохи менший шрифт
+                # Якщо виконано - можна закреслити текст (text-decoration: line-through)
                 text_style = "text-decoration: line-through; color: #777;" if sub.is_completed else "color: #ddd;"
 
                 cb.setStyleSheet(f"""
@@ -139,7 +140,7 @@ class QuestCard(QFrame):
                 """)
                 cb.setCursor(Qt.PointingHandCursor)
 
-                # Підключаємо сигнал
+                # Підключаємо сигнал (використовуємо lambda для передачі конкретної підцілі)
                 cb.stateChanged.connect(lambda state, s=sub: self.on_subgoal_checked(self.goal, s, state == Qt.Checked))
 
                 subs_layout.addWidget(cb)
@@ -152,13 +153,15 @@ class QuestCard(QFrame):
             QLabel(f"{self.goal.difficulty.name}",
                    styleSheet="font-size: 11px; color: #bdc3c7; border: 1px solid #444; padding: 2px 4px; border-radius: 3px;"))
 
-        created_str = self.goal.created_at.strftime('%d.%m.%Y')
+        # ВИПРАВЛЕНО: Додано час до дати створення
+        created_str = self.goal.created_at.strftime('%d.%m.%Y %H:%M')
         info.addWidget(QLabel(f"Створено: {created_str}", styleSheet="font-size: 11px; color: #666; margin-left: 5px;"))
 
         info.addStretch()
 
         date_col = "#e74c3c" if self.goal.is_overdue() else "#bdc3c7"
-        info.addWidget(QLabel(f"⏳ {self.goal.deadline.strftime('%Y-%m-%d %H:%M')}",
+        # Формат дати дедлайну вже був виправлений на День.Місяць.Рік Години:Хвилини
+        info.addWidget(QLabel(f"⏳ {self.goal.deadline.strftime('%d.%m.%Y %H:%M')}",
                               styleSheet=f"font-size: 12px; color: {date_col}; font-weight: bold;"))
         layout.addLayout(info)
 
@@ -199,9 +202,10 @@ class HabitCard(QFrame):
         header = QHBoxLayout()
         lbl_title = QLabel(f"📅 {self.goal.title}")
         lbl_title.setStyleSheet("font-weight: bold; font-size: 14px; color: white;")
-        header.addWidget(lbl_title, stretch=1)
+        header.addWidget(lbl_title)
+        header.addStretch()
 
-        # Кнопка редагування (Жовта)
+        # Кнопка редагування (Жовта, текстом)
         btn_edit = QPushButton("✏️ Редагувати")
         btn_edit.setCursor(Qt.PointingHandCursor)
         btn_edit.setStyleSheet("""
@@ -218,7 +222,7 @@ class HabitCard(QFrame):
         btn_edit.clicked.connect(lambda: self.on_edit(self.goal))
         header.addWidget(btn_edit)
 
-        # --- ДОДАНО: Кнопка видалення (червоний хрестик) ---
+        # Кнопка видалення (червоний хрестик)
         btn_del = QPushButton("✕")
         btn_del.setCursor(Qt.PointingHandCursor)
         btn_del.setFixedSize(24, 24)
@@ -234,7 +238,6 @@ class HabitCard(QFrame):
         """)
         btn_del.clicked.connect(lambda: self.on_delete(self.goal))
         header.addWidget(btn_del)
-        # -----------------------------------------------------------
 
         layout.addLayout(header)
 
