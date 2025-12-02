@@ -84,7 +84,7 @@ class AddGoalDialog(QDialog):
             return
 
         try:
-            self.service.add_goal(title, desc, difficulty, deadline)
+            self.service.create_goal(title, desc, deadline, difficulty)
             self.accept()
         except Exception as e:
             QMessageBox.critical(self, "Помилка", str(e))
