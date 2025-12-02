@@ -3,14 +3,14 @@ import sys
 from datetime import datetime, timedelta
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QPushButton, QScrollArea, QMessageBox, QTabWidget
+    QLabel, QPushButton, QScrollArea, QMessageBox, QTabWidget, QComboBox
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 
 from src.logic import GoalService
 from src.models import Goal, Difficulty, LongTermGoal
-from src.ui.dialogs import AddGoalDialog
-from src.ui.longterm_dialog import AddLongTermDialog
+from src.ui.dialogs import AddGoalDialog, EditGoalDialog, SubgoalsDialog
+from src.ui.longterm_dialog import AddLongTermDialog, EditLongTermDialog
 from src.ui.stats_dialog import StatsDialog
 from src.ui.inventory_dialog import InventoryDialog
 from src.ui.shop_dialog import ShopDialog
@@ -34,8 +34,6 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle("Learning Goals RPG 🛡️")
         self.resize(1000, 800)
-        # Видалено світлий фон, тепер працює глобальний стиль
-        # self.setStyleSheet("background-color: #f0f2f5;")
 
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
@@ -78,15 +76,16 @@ class MainWindow(QMainWindow):
 
         # 2. НИЖНЯ СЕКЦІЯ
         self.tabs = QTabWidget()
-        # Видалено локальні стилі вкладок, тепер вони беруться з style.qss
 
+        # --- Tab Quests ---
         self.tab_quests = QWidget()
         l1 = QVBoxLayout(self.tab_quests)
         l1.setContentsMargins(0, 10, 0, 0)
-        self.create_tab_controls(l1, "➕ Новий Квест", self.on_add_goal)
+        self.create_tab_controls(l1, "➕ Новий Квест", self.on_add_goal, add_sorting=True, add_cleanup=True)
         self.quest_list_layout = self.create_scroll_area(l1)
         self.tabs.addTab(self.tab_quests, "⚔️ Квести")
 
+        # --- Tab Habits ---
         self.tab_longterm = QWidget()
         l2 = QVBoxLayout(self.tab_longterm)
         l2.setContentsMargins(0, 10, 0, 0)
@@ -96,8 +95,8 @@ class MainWindow(QMainWindow):
 
         self.root_layout.addWidget(self.tabs)
 
-        self.middle_panel.skills_clicked.connect(self.open_skills_dialog)  # Підключення вікна
-        self.middle_panel.skill_used_signal.connect(self.use_skill)  # Підключення кнопок
+        self.middle_panel.skills_clicked.connect(self.open_skills_dialog)
+        self.middle_panel.skill_used_signal.connect(self.use_skill)
 
     def open_skills_dialog(self):
         try:
@@ -106,48 +105,116 @@ class MainWindow(QMainWindow):
             print(e)
 
     def use_skill(self, skill_id):
-        """Використання навички з MiddlePanel."""
         try:
             msg = self.service.use_skill(skill_id)
-            self.refresh_data()  # Оновити ману/HP/ворога
+            self.refresh_data()
             QMessageBox.information(self, "Навичка", msg)
-
         except ValueError as e:
             QMessageBox.warning(self, "Неможливо", str(e))
         except Exception as e:
             print(f"Skill Error: {e}")
 
-    def create_tab_controls(self, layout, btn_text, btn_command):
+    def create_tab_controls(self, layout, btn_text, btn_command, add_sorting=False, add_cleanup=False):
         box = QHBoxLayout()
         box.setContentsMargins(5, 0, 5, 0)
+        # Встановлюємо spacing 10, щоб елементи не злипалися
+        box.setSpacing(10)
 
+        # Спільний стиль висоти для кнопок і списку (наприклад 35px)
+        # Це гарантує, що вони будуть однієї висоти
+        height_style = "height: 35px; max-height: 35px; min-height: 35px;"
+
+        # Кнопка "Додати"
         btn_add = QPushButton(btn_text)
         btn_add.setCursor(Qt.PointingHandCursor)
-        # Зберігаємо стиль кнопок (зелений), як ви просили
-        btn_add.setStyleSheet(
-            "QPushButton { background-color: #27ae60; color: white; padding: 10px; font-weight: bold; border-radius: 5px; } QPushButton:hover { background-color: #2ecc71; }")
+        btn_add.setStyleSheet(f"""
+            QPushButton {{ 
+                background-color: #27ae60; 
+                color: white; 
+                padding: 0 15px; 
+                font-weight: bold; 
+                border-radius: 5px;
+                {height_style}
+            }} 
+            QPushButton:hover {{ background-color: #2ecc71; }}
+        """)
         btn_add.clicked.connect(btn_command)
+        box.addWidget(btn_add)
 
+        # Кнопка "Оновити"
         btn_refresh = QPushButton("🔄")
         btn_refresh.setCursor(Qt.PointingHandCursor)
         btn_refresh.setFixedWidth(50)
-        # Зберігаємо стиль кнопок (сірий)
-        btn_refresh.setStyleSheet(
-            "QPushButton { background-color: #95a5a6; color: white; border-radius: 5px; padding: 10px; font-weight: bold; } QPushButton:hover { background-color: #7f8c8d; }")
+        btn_refresh.setStyleSheet(f"""
+            QPushButton {{ 
+                background-color: #95a5a6; 
+                color: white; 
+                border-radius: 5px; 
+                font-weight: bold;
+                {height_style}
+            }} 
+            QPushButton:hover {{ background-color: #7f8c8d; }}
+        """)
         btn_refresh.clicked.connect(self.refresh_data)
-
-        box.addWidget(btn_add)
         box.addWidget(btn_refresh)
+
+        # Сортування
+        if add_sorting:
+            self.sort_combo = QComboBox()
+            self.sort_combo.addItems(
+                ["Дедлайн (спочатку старі)", "Дедлайн (спочатку нові)", "Пріоритет (Складність)", "Прогрес",
+                 "Дата створення"])
+            self.sort_combo.setFixedWidth(220)
+            # Стиль списку: вирівнюємо висоту, додаємо padding, стилізуємо
+            self.sort_combo.setStyleSheet(f"""
+                QComboBox {{ 
+                    padding-left: 10px;
+                    border: 1px solid #555; 
+                    border-radius: 5px; 
+                    background: #333; 
+                    color: white;
+                    {height_style}
+                }}
+                QComboBox::drop-down {{ border: none; }}
+                QComboBox::down-arrow {{ 
+                    image: none; 
+                    border-left: 2px solid #777; 
+                    border-bottom: 2px solid #777; 
+                    width: 8px; height: 8px; 
+                    margin-right: 10px; 
+                    transform: rotate(-45deg); 
+                }}
+            """)
+            self.sort_combo.currentIndexChanged.connect(self.update_quest_list)
+            box.addWidget(self.sort_combo)
+
+        # Кнопка "Автовидалення" (Червона)
+        if add_cleanup:
+            btn_cleanup = QPushButton("🗑️ Автовидалення")
+            btn_cleanup.setCursor(Qt.PointingHandCursor)
+            btn_cleanup.setStyleSheet(f"""
+                QPushButton {{ 
+                    background-color: #c0392b; 
+                    color: white; 
+                    padding: 0 15px; 
+                    font-weight: bold; 
+                    border-radius: 5px;
+                    {height_style}
+                }} 
+                QPushButton:hover {{ background-color: #e74c3c; }}
+            """)
+            btn_cleanup.clicked.connect(self.on_auto_delete_completed)
+            box.addWidget(btn_cleanup)
+
+        box.addStretch()
         layout.addLayout(box)
 
     def create_scroll_area(self, layout):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        # Прибрано фон, залишено тільки прибирання рамки
         scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
 
         container = QWidget()
-        # Прибрано світлий фон контейнера
         container.setStyleSheet("background: transparent;")
 
         vbox = QVBoxLayout(container)
@@ -165,7 +232,6 @@ class MainWindow(QMainWindow):
 
     def on_tick(self):
         simulated_now = datetime.now() + self.time_offset
-
         try:
             hero = self.service.get_hero()
             self.middle_panel.update_data(hero, simulated_now)
@@ -205,7 +271,22 @@ class MainWindow(QMainWindow):
 
         try:
             goals = self.service.get_all_goals()
-            goals.sort(key=lambda x: (x.is_completed, x.deadline))
+
+            # Сортування
+            if hasattr(self, 'sort_combo'):
+                mode = self.sort_combo.currentText()
+                if "Дедлайн (спочатку старі)" in mode:
+                    goals.sort(key=lambda x: (x.is_completed, x.deadline))
+                elif "Дедлайн (спочатку нові)" in mode:
+                    goals.sort(key=lambda x: (x.is_completed, x.deadline), reverse=True)
+                elif "Пріоритет" in mode:
+                    goals.sort(key=lambda x: (x.is_completed, -x.difficulty.value))
+                elif "Прогрес" in mode:
+                    goals.sort(key=lambda x: (x.is_completed, -x.calculate_progress()))
+                elif "Дата створення" in mode:
+                    goals.sort(key=lambda x: (x.is_completed, x.created_at), reverse=True)
+            else:
+                goals.sort(key=lambda x: (x.is_completed, x.deadline))
 
             if not goals:
                 self.quest_list_layout.addWidget(
@@ -213,7 +294,7 @@ class MainWindow(QMainWindow):
                            alignment=Qt.AlignCenter))
             else:
                 for g in goals:
-                    card = QuestCard(g, self.complete_goal, self.delete_goal)
+                    card = QuestCard(g, self.complete_goal, self.delete_goal, self.edit_goal, self.manage_subgoals)
                     self.quest_list_layout.addWidget(card)
         except Exception as e:
             self.quest_list_layout.addWidget(QLabel(f"Помилка: {e}", styleSheet="color: red;"))
@@ -233,7 +314,7 @@ class MainWindow(QMainWindow):
                            alignment=Qt.AlignCenter))
             else:
                 for g in lt_goals:
-                    card = HabitCard(g, simulated_now, self.start_habit, self.finish_habit)
+                    card = HabitCard(g, simulated_now, self.start_habit, self.finish_habit, self.edit_habit)
                     self.longterm_list_layout.addWidget(card)
         except Exception as e:
             self.longterm_list_layout.addWidget(QLabel(f"Помилка: {e}", styleSheet="color: red;"))
@@ -244,6 +325,30 @@ class MainWindow(QMainWindow):
 
     def on_add_longterm(self):
         if AddLongTermDialog(self, self.service).exec_(): self.refresh_data()
+
+    def on_auto_delete_completed(self):
+        """Видаляє всі виконані квести."""
+        goals = self.service.get_all_goals()
+        completed = [g for g in goals if g.is_completed]
+
+        if not completed:
+            QMessageBox.information(self, "Інфо", "Немає виконаних квестів для видалення.")
+            return
+
+        reply = QMessageBox.question(
+            self, 'Автовидалення',
+            f"Ви впевнені, що хочете видалити {len(completed)} виконаних квестів?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+
+        if reply == QMessageBox.Yes:
+            try:
+                for g in completed:
+                    self.service.delete_goal(g.id)
+                self.refresh_data()
+                QMessageBox.information(self, "Успіх", "Виконані квести видалено.")
+            except Exception as e:
+                QMessageBox.critical(self, "Помилка", f"Не вдалося видалити:\n{str(e)}")
 
     def complete_goal(self, goal):
         try:
@@ -262,6 +367,18 @@ class MainWindow(QMainWindow):
                 self.refresh_data()
         except Exception as e:
             QMessageBox.critical(self, "Помилка", f"Не вдалося видалити:\n{str(e)}")
+
+    def edit_goal(self, goal):
+        if EditGoalDialog(self, self.service, goal).exec_():
+            self.refresh_data()
+
+    def manage_subgoals(self, goal):
+        if SubgoalsDialog(self, self.service, goal).exec_():
+            self.refresh_data()
+
+    def edit_habit(self, goal):
+        if EditLongTermDialog(self, self.service, goal).exec_():
+            self.refresh_data()
 
     def start_habit(self, goal):
         try:
@@ -295,13 +412,11 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Помилка", f"Не вдалося відкрити інвентар:\n{str(e)}")
 
     def open_shop(self):
-        """Відкриває магазин."""
         try:
             ShopDialog(self, self.service).exec_()
-            self.refresh_data()  # Оновлюємо золото після покупок
+            self.refresh_data()
         except Exception as e:
             QMessageBox.critical(self, "Помилка", f"Не вдалося відкрити магазин:\n{str(e)}")
-            print(f"Shop Crash Details: {e}")
 
     def on_logout(self):
         reply = QMessageBox.question(self, 'Вихід', "Вийти з акаунту?", QMessageBox.Yes | QMessageBox.No)
