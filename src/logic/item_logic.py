@@ -39,7 +39,6 @@ class ItemLogic:
         """Розрахунок всіх бонусів від спорядження."""
         equipped = self.get_equipped_items()
 
-        # ⚠️ ТУТ БУЛА ПОМИЛКА: Ми додали ключ 'double_attack_chance'
         bonuses = {
             'str': 0, 'int': 0, 'dex': 0, 'vit': 0, 'def': 0,
             'base_dmg': 0,
