@@ -17,10 +17,14 @@ class EnemyGenerator:
         image_file = ""
         dmg_type = DamageType.PHYSICAL  # Дефолт
 
+        # Генеруємо випадковий варіант картинки від 1 до 3
+        variant = random.randint(1, 3)
+
         if roll <= 50:
             rarity = EnemyRarity.EASY
             name = "Лінивий Гоблін"
-            image_file = "goblin.png"
+            # Використовуємо варіант у назві файлу: goblin1.png, goblin2.png або goblin3.png
+            image_file = f"goblin{variant}.png"
             hp_mult = 1.0
             xp_mult = 1.0
             dmg_mult = 0.5
@@ -29,7 +33,7 @@ class EnemyGenerator:
         elif roll <= 85:
             rarity = EnemyRarity.MEDIUM
             name = "Горгона Прокрастинації"
-            image_file = "gorgon.png"
+            image_file = f"gorgon{variant}.png"
             hp_mult = 2.0
             xp_mult = 2.0
             dmg_mult = 1.0
@@ -38,7 +42,7 @@ class EnemyGenerator:
         else:
             rarity = EnemyRarity.HARD
             name = "Мінотавр Інертності"
-            image_file = "minotaur.png"
+            image_file = f"minotaur{variant}.png"
             hp_mult = 4.0
             xp_mult = 4.0
             dmg_mult = 1.5
