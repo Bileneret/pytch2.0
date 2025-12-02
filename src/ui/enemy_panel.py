@@ -15,7 +15,7 @@ class EnemyWidget(QFrame):
         super().__init__()
 
         # --- ЖОРСТКА ФІКСАЦІЯ РОЗМІРІВ ---
-        self.setFixedSize(200, 400)
+        self.setFixedSize(200, 350)
         # Фон і загальні стилі тепер беруться з style.qss
         self.setup_ui()
 

@@ -14,7 +14,7 @@ def get_project_root():
 class HeroPanel(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedSize(200, 400)
+        self.setFixedSize(200, 350)
 
         # --- ПОВЕРНУЛИ РАМКУ ---
         # Фон не задаємо (він буде темним з style.qss),
