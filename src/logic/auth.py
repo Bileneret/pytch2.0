@@ -11,6 +11,18 @@ class AuthService:
             raise ValueError("Введіть нікнейм!")
 
         hero = Hero(nickname=nickname, hero_class=h_class, gender=gender, appearance=appearance)
+
+        # --- СПЕЦІАЛЬНА ЛОГІКА ДЛЯ "tester" ---
+        if nickname.lower() == "tester":
+            hero.level = 24
+            # Розрахунок XP до наступного рівня для 24-го рівня
+            # Формула з hero_logic: int(hero.level * 100 * 1.5)
+            hero.xp_to_next_level = int(hero.level * 100 * 1.5)
+
+            # Нараховуємо 23 очки характеристик (за кожен рівень з 2 по 24)
+            hero.stat_points = 23
+        # --------------------------------------
+
         # Оновлюємо похідні стати (HP/Mana) при створенні
         hero.update_derived_stats()
         # При створенні HP повне

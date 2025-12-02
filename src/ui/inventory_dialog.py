@@ -102,11 +102,14 @@ class InventoryDialog(QDialog):
         self.lbl_bonuses.setWordWrap(True)
         self.right_layout.addWidget(self.lbl_bonuses)
 
-        # DEBUG BUTTON
-        btn_debug_add = QPushButton("🎁 Отримати тестові речі")
-        btn_debug_add.setCursor(Qt.PointingHandCursor)
-        btn_debug_add.clicked.connect(self.add_test_items)
-        self.right_layout.addWidget(btn_debug_add)
+        # --- ЗМІНА ТУТ: DEBUG BUTTON ЛИШЕ ДЛЯ tester ---
+        hero = self.service.get_hero()
+        if hero.nickname.lower() == "tester":
+            btn_debug_add = QPushButton("🎁 Отримати тестові речі")
+            btn_debug_add.setCursor(Qt.PointingHandCursor)
+            btn_debug_add.clicked.connect(self.add_test_items)
+            self.right_layout.addWidget(btn_debug_add)
+        # ------------------------------------------------
 
         self.layout.addWidget(self.left_panel, stretch=3)
         self.layout.addWidget(self.right_panel, stretch=2)
