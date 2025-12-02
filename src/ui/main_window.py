@@ -9,11 +9,16 @@ from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 
 from src.logic import GoalService
 from src.models import Goal, Difficulty, LongTermGoal
-from src.ui.dialogs import AddGoalDialog, EditGoalDialog, SubgoalsDialog
-from src.ui.longterm_dialog import AddLongTermDialog, EditLongTermDialog
+from src.ui.dialogs import AddGoalDialog
+from src.ui.longterm_dialog import AddLongTermDialog
 from src.ui.stats_dialog import StatsDialog
 from src.ui.inventory_dialog import InventoryDialog
 from src.ui.shop_dialog import ShopDialog
+
+# Нові імпорти з окремих файлів
+from src.ui.subgoals_dialog import SubgoalsDialog
+from src.ui.edit_goal_dialog import EditGoalDialog
+from src.ui.edit_longterm_dialog import EditLongTermDialog
 
 # Імпорт панелей
 from src.ui.hero_panel import HeroPanel
@@ -117,11 +122,9 @@ class MainWindow(QMainWindow):
     def create_tab_controls(self, layout, btn_text, btn_command, add_sorting=False, add_cleanup=False):
         box = QHBoxLayout()
         box.setContentsMargins(5, 0, 5, 0)
-        # Встановлюємо spacing 10, щоб елементи не злипалися
         box.setSpacing(10)
 
-        # Спільний стиль висоти для кнопок і списку (наприклад 35px)
-        # Це гарантує, що вони будуть однієї висоти
+        # Вирівнювання висоти: 35px
         height_style = "height: 35px; max-height: 35px; min-height: 35px;"
 
         # Кнопка "Додати"
@@ -165,7 +168,6 @@ class MainWindow(QMainWindow):
                 ["Дедлайн (спочатку старі)", "Дедлайн (спочатку нові)", "Пріоритет (Складність)", "Прогрес",
                  "Дата створення"])
             self.sort_combo.setFixedWidth(220)
-            # Стиль списку: вирівнюємо висоту, додаємо padding, стилізуємо
             self.sort_combo.setStyleSheet(f"""
                 QComboBox {{ 
                     padding-left: 10px;
