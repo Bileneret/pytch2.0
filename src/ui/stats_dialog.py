@@ -168,7 +168,7 @@ class StatsDialog(QDialog):
             total_val = new_base + bonus_val
 
             if bonus_val > 0:
-                val_text = f"{total_val} <span style='color:gray; font-size:10px;'>({new_base} + <span style='color:#27ae60;'>{bonus_val}</span>)</span>"
+                val_text = f"{total_val} <span style='color:gray; font-size:14px;'>({new_base} + <span style='color:#27ae60;'>{bonus_val}</span>)</span>"
             else:
                 val_text = f"{total_val}"
 

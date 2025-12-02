@@ -45,16 +45,16 @@ class MiddlePanel(QFrame):
         top_bar.setAlignment(Qt.AlignCenter)
         self.lbl_clock = QLabel("00:00:00")
         self.lbl_clock.setStyleSheet("font-size: 16px; font-family: monospace; font-weight: bold; color: #ecf0f1;")
-        self.btn_debug = QPushButton("+");
-        self.btn_debug.setFixedSize(20, 20);
-        self.btn_debug.clicked.connect(self.debug_time_clicked.emit);
+        self.btn_debug = QPushButton("+")
+        self.btn_debug.setFixedSize(20, 20)
+        self.btn_debug.clicked.connect(self.debug_time_clicked.emit)
         self.btn_debug.hide()
-        self.btn_logout = QPushButton("🚪");
-        self.btn_logout.setFixedSize(30, 30);
+        self.btn_logout = QPushButton("🚪")
+        self.btn_logout.setFixedSize(30, 30)
         self.btn_logout.clicked.connect(self.logout_clicked.emit)
-        top_bar.addWidget(self.lbl_clock);
-        top_bar.addWidget(self.btn_debug);
-        top_bar.addSpacing(10);
+        top_bar.addWidget(self.lbl_clock)
+        top_bar.addWidget(self.btn_debug)
+        top_bar.addSpacing(10)
         top_bar.addWidget(self.btn_logout)
         main_layout.addLayout(top_bar)
 
@@ -72,36 +72,15 @@ class MiddlePanel(QFrame):
         self.btn_inventory.clicked.connect(self.inventory_clicked.emit)
         grid.addWidget(self.btn_inventory, 0, 1)
 
-        # Характеристики (З контейнером для тексту)
-        stats_cont = QWidget();
-        stats_l = QVBoxLayout(stats_cont);
-        stats_l.setContentsMargins(0, 0, 0, 0);
-        stats_l.setSpacing(5)
+        # Характеристики (ПРОСТО КНОПКА)
         self.btn_stats = self.create_menu_button("Характеристики", "#3498db", "#2980b9")
         self.btn_stats.clicked.connect(self.stats_clicked.emit)
-        self.lbl_stats_summary = QLabel("Stats...");
-        self.lbl_stats_summary.setAlignment(Qt.AlignCenter);
-        self.lbl_stats_summary.setStyleSheet("font-size: 9px; color: #bdc3c7;")
-        stats_l.addWidget(self.btn_stats);
-        stats_l.addWidget(self.lbl_stats_summary)
-        grid.addWidget(stats_cont, 1, 0)
+        grid.addWidget(self.btn_stats, 1, 0)
 
-        # Навички (З контейнером для тексту - ВИПРАВЛЕНО СТИЛЬ)
-        skills_cont = QWidget();
-        skills_l = QVBoxLayout(skills_cont);
-        skills_l.setContentsMargins(0, 0, 0, 0);
-        skills_l.setSpacing(5)
-        # Використовуємо той самий метод create_menu_button, щоб стиль був ідентичний
+        # Навички (ПРОСТО КНОПКА)
         self.btn_skills = self.create_menu_button("Навички", "#9b59b6", "#8e44ad")
         self.btn_skills.clicked.connect(self.skills_clicked.emit)
-
-        self.lbl_skills_summary = QLabel("Skills...");
-        self.lbl_skills_summary.setAlignment(Qt.AlignCenter);
-        self.lbl_skills_summary.setStyleSheet("font-size: 9px; color: #bdc3c7;")
-
-        skills_l.addWidget(self.btn_skills)
-        skills_l.addWidget(self.lbl_skills_summary)
-        grid.addWidget(skills_cont, 1, 1)
+        grid.addWidget(self.btn_skills, 1, 1)
 
         main_layout.addLayout(grid)
 
@@ -142,16 +121,9 @@ class MiddlePanel(QFrame):
         return btn
 
     def update_data(self, hero, simulated_time):
-        self.lbl_stats_summary.setText(
-            f"⚔️{hero.str_stat} 🧠{hero.int_stat} 🎯{hero.dex_stat} ❤️{hero.vit_stat} 🛡️{hero.def_stat}")
-
-        # Відображення кількості відкритих навичок
-        unlocked_count = 0
-        for lvl in [5, 10, 15, 20, 25]:
-            if hero.level >= lvl: unlocked_count += 1
-        self.lbl_skills_summary.setText(f"Відкрито: {unlocked_count}/5")
-
+        # Оновлення годинника
         self.lbl_clock.setText(simulated_time.strftime("%H:%M:%S"))
+
         if hero.nickname.lower() == "tester":
             self.btn_debug.show()
         else:
