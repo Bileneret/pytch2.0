@@ -10,7 +10,7 @@ class QuestCard(QFrame):
         self.goal = goal
         self.on_edit = on_edit
         self.on_subgoals = on_subgoals
-        self.on_subgoal_checked = on_subgoal_checked  # Новий колбек для чекбоксів
+        self.on_subgoal_checked = on_subgoal_checked
         self.setup_ui(on_complete, on_delete)
 
     def setup_ui(self, on_complete, on_delete):
@@ -130,8 +130,7 @@ class QuestCard(QFrame):
             for sub in self.goal.subgoals:
                 cb = QCheckBox(sub.title)
                 cb.setChecked(sub.is_completed)
-                # Стиль чекбокса: білий текст, трохи менший шрифт
-                # Якщо виконано - можна закреслити текст (text-decoration: line-through)
+                # Стиль чекбокса
                 text_style = "text-decoration: line-through; color: #777;" if sub.is_completed else "color: #ddd;"
 
                 cb.setStyleSheet(f"""
@@ -140,7 +139,7 @@ class QuestCard(QFrame):
                 """)
                 cb.setCursor(Qt.PointingHandCursor)
 
-                # Підключаємо сигнал (використовуємо lambda для передачі конкретної підцілі)
+                # Підключаємо сигнал
                 cb.stateChanged.connect(lambda state, s=sub: self.on_subgoal_checked(self.goal, s, state == Qt.Checked))
 
                 subs_layout.addWidget(cb)
@@ -165,11 +164,12 @@ class QuestCard(QFrame):
 
 
 class HabitCard(QFrame):
-    def __init__(self, goal, simulated_now, on_start, on_finish, on_edit):
+    def __init__(self, goal, simulated_now, on_start, on_finish, on_edit, on_delete):
         super().__init__()
         self.goal = goal
         self.simulated_now = simulated_now
         self.on_edit = on_edit
+        self.on_delete = on_delete  # Новий колбек
         self.setup_ui(on_start, on_finish)
 
     def setup_ui(self, on_start, on_finish):
@@ -199,10 +199,9 @@ class HabitCard(QFrame):
         header = QHBoxLayout()
         lbl_title = QLabel(f"📅 {self.goal.title}")
         lbl_title.setStyleSheet("font-weight: bold; font-size: 14px; color: white;")
-        header.addWidget(lbl_title)
-        header.addStretch()
+        header.addWidget(lbl_title, stretch=1)
 
-        # Кнопка редагування (Жовта, текстом)
+        # Кнопка редагування (Жовта)
         btn_edit = QPushButton("✏️ Редагувати")
         btn_edit.setCursor(Qt.PointingHandCursor)
         btn_edit.setStyleSheet("""
@@ -218,6 +217,24 @@ class HabitCard(QFrame):
         """)
         btn_edit.clicked.connect(lambda: self.on_edit(self.goal))
         header.addWidget(btn_edit)
+
+        # --- ДОДАНО: Кнопка видалення (червоний хрестик) ---
+        btn_del = QPushButton("✕")
+        btn_del.setCursor(Qt.PointingHandCursor)
+        btn_del.setFixedSize(24, 24)
+        btn_del.setStyleSheet("""
+            QPushButton { 
+                color: #e74c3c; 
+                background-color: transparent;
+                font-weight: bold; 
+                font-size: 14px; 
+                border: none;
+            } 
+            QPushButton:hover { background-color: #3e3e3e; border-radius: 12px; }
+        """)
+        btn_del.clicked.connect(lambda: self.on_delete(self.goal))
+        header.addWidget(btn_del)
+        # -----------------------------------------------------------
 
         layout.addLayout(header)
 

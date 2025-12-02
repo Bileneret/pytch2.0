@@ -502,6 +502,13 @@ class StorageService:
         conn.close()
         return goals
 
+    def delete_long_term_goal(self, goal_id: uuid.UUID):
+        """Видаляє довгострокову звичку з БД."""
+        conn = self._get_connection()
+        conn.execute("DELETE FROM long_term_goals WHERE id = ?", (str(goal_id),))
+        conn.commit()
+        conn.close()
+
     def save_enemy(self, enemy: Enemy, hero_id: str):
         conn = self._get_connection()
         conn.execute(

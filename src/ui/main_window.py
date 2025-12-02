@@ -318,7 +318,7 @@ class MainWindow(QMainWindow):
                            alignment=Qt.AlignCenter))
             else:
                 for g in goals:
-                    # Передаємо НОВИЙ колбек
+                    # Передаємо колбек
                     card = QuestCard(g, self.complete_goal, self.delete_goal, self.edit_goal, self.manage_subgoals,
                                      self.on_card_subgoal_checked)
                     self.quest_list_layout.addWidget(card)
@@ -353,7 +353,9 @@ class MainWindow(QMainWindow):
                            alignment=Qt.AlignCenter))
             else:
                 for g in lt_goals:
-                    card = HabitCard(g, simulated_now, self.start_habit, self.finish_habit, self.edit_habit)
+                    # Передаємо self.delete_habit як останній аргумент
+                    card = HabitCard(g, simulated_now, self.start_habit, self.finish_habit, self.edit_habit,
+                                     self.delete_habit)
                     self.longterm_list_layout.addWidget(card)
         except Exception as e:
             self.longterm_list_layout.addWidget(QLabel(f"Помилка: {e}", styleSheet="color: red;"))
@@ -361,24 +363,18 @@ class MainWindow(QMainWindow):
     # --- НОВИЙ МЕТОД ---
     def on_card_subgoal_checked(self, goal, subgoal, is_checked):
         """Обробляє зміну стану чекбокса підцілі на картці квесту."""
-        # 1. Зберігаємо стан підцілі
         subgoal.is_completed = is_checked
         self.service.storage.save_goal(goal, self.service.hero_id)
 
-        # 2. Логіка завершення / відкату
         if is_checked:
-            # Якщо всі підцілі виконані і сама ціль ще ні -> завершуємо з нагородою
             if not goal.is_completed and goal.subgoals and all(s.is_completed for s in goal.subgoals):
                 msg = self.service.complete_goal(goal)
                 QMessageBox.information(self, "Квест виконано!", f"Всі підцілі завершено!\n{msg}")
-
         else:
-            # Якщо галочку зняли, а ціль була виконана -> відкат (знімаємо статус, забираємо XP/Gold)
             if goal.is_completed:
                 msg = self.service.undo_complete_goal(goal)
                 QMessageBox.warning(self, "Відміна виконання", f"Ціль повернута до активних.\n{msg}")
 
-        # 3. Оновлюємо вигляд карток
         self.refresh_data()
 
     # --- ACTIONS ---
@@ -428,6 +424,17 @@ class MainWindow(QMainWindow):
                 self.refresh_data()
         except Exception as e:
             QMessageBox.critical(self, "Помилка", f"Не вдалося видалити:\n{str(e)}")
+
+    # --- НОВИЙ МЕТОД ДЛЯ ВИДАЛЕННЯ ЗВИЧКИ ---
+    def delete_habit(self, goal):
+        try:
+            reply = QMessageBox.question(self, 'Видалити?', f"Видалити звичку '{goal.title}'?",
+                                         QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                self.service.delete_long_term_goal(goal.id)
+                self.refresh_data()
+        except Exception as e:
+            QMessageBox.critical(self, "Помилка", f"Не вдалося видалити звичку:\n{str(e)}")
 
     def edit_goal(self, goal):
         if EditGoalDialog(self, self.service, goal).exec_():

@@ -16,6 +16,10 @@ class HabitLogic:
                              time_frame=time_frame, daily_state='pending')
         self.storage.save_long_term_goal(quest, self.hero_id)
 
+    def delete_long_term_goal(self, goal_id):
+        """Видаляє звичку."""
+        self.storage.delete_long_term_goal(goal_id)
+
     def get_long_term_goals(self, custom_now: datetime = None) -> Tuple[List[LongTermGoal], List[str]]:
         goals = self.storage.load_long_term_goals(self.hero_id)
         hero = self.get_hero()
