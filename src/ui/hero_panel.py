@@ -14,7 +14,7 @@ def get_project_root():
 class HeroPanel(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedSize(200, 400)
+        self.setFixedSize(200, 300)
         self.setStyleSheet("""
             QFrame {
                 background-color: #2c3e50; 

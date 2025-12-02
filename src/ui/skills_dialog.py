@@ -47,12 +47,12 @@ class SkillsDialog(QDialog):
             row = QHBoxLayout(frame)
 
             lbl_icon = QLabel()
-            lbl_icon.setFixedSize(50, 50)
+            lbl_icon.setFixedSize(64, 64)
             lbl_icon.setAlignment(Qt.AlignCenter)
             icon_path = os.path.join(base_path, "assets", "skills", cls_folder, f"skill{s['id']}.png")
 
             if os.path.exists(icon_path):
-                pix = QPixmap(icon_path).scaled(40, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                pix = QPixmap(icon_path).scaled(64, 64, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 lbl_icon.setPixmap(pix)
             else:
                 lbl_icon.setText("🔮")
