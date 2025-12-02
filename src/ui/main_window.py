@@ -19,6 +19,7 @@ from src.ui.shop_dialog import ShopDialog
 from src.ui.subgoals_dialog import SubgoalsDialog
 from src.ui.edit_goal_dialog import EditGoalDialog
 from src.ui.edit_longterm_dialog import EditLongTermDialog
+from src.ui.ai_goal_dialog import AIGoalDialog  # <--- НОВИЙ ІМПОРТ
 
 # Імпорт панелей
 from src.ui.hero_panel import HeroPanel
@@ -30,6 +31,7 @@ from src.ui.skills_dialog import SkillsDialog
 
 
 class MainWindow(QMainWindow):
+    # ... (весь код __init__ та setup_ui без змін) ...
     logout_signal = pyqtSignal()
 
     def __init__(self, service: GoalService):
@@ -97,7 +99,8 @@ class MainWindow(QMainWindow):
                         "Дата створення"],
             on_sort_change=self.update_quest_list,
             add_cleanup=True,
-            cleanup_command=self.on_auto_delete_completed
+            cleanup_command=self.on_auto_delete_completed,
+            add_ai_btn=True  # <--- ВМИКАЄМО AI КНОПКУ ТІЛЬКИ ТУТ
         )
 
         self.quest_list_layout = self.create_scroll_area(l1)
@@ -129,6 +132,7 @@ class MainWindow(QMainWindow):
         self.middle_panel.skills_clicked.connect(self.open_skills_dialog)
         self.middle_panel.skill_used_signal.connect(self.use_skill)
 
+    # ... (методи open_skills_dialog, use_skill без змін) ...
     def open_skills_dialog(self):
         try:
             SkillsDialog(self, self.service).exec_()
@@ -145,8 +149,9 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Skill Error: {e}")
 
+    # Оновлений метод create_tab_controls
     def create_tab_controls(self, layout, btn_text, btn_command, refresh_command, sort_items=None, on_sort_change=None,
-                            add_cleanup=False, cleanup_command=None):
+                            add_cleanup=False, cleanup_command=None, add_ai_btn=False):
         box = QHBoxLayout()
         box.setContentsMargins(5, 0, 5, 0)
         box.setSpacing(10)
@@ -154,6 +159,7 @@ class MainWindow(QMainWindow):
         # --- НАЛАШТУВАННЯ РОЗМІРІВ ---
         BTN_ADD_HEIGHT = 36
         BTN_ADD_WIDTH = 140
+        BTN_AI_WIDTH = 100  # Ширина кнопки AI
         BTN_REFRESH_HEIGHT = 36
         BTN_REFRESH_WIDTH = 50
         COMBO_SORT_HEIGHT = 36
@@ -179,6 +185,25 @@ class MainWindow(QMainWindow):
         """)
         btn_add.clicked.connect(btn_command)
         box.addWidget(btn_add)
+
+        # 1.5. Кнопка "ШІ цілі" (Синя, якщо увімкнено)
+        if add_ai_btn:
+            btn_ai = QPushButton("🤖 ШІ ціль")
+            btn_ai.setCursor(Qt.PointingHandCursor)
+            btn_ai.setFixedSize(BTN_AI_WIDTH, BTN_ADD_HEIGHT)
+            btn_ai.setStyleSheet(f"""
+                QPushButton {{ 
+                    background-color: #3498db; 
+                    color: white; 
+                    border: none;
+                    border-radius: 5px;
+                    font-weight: bold;
+                    font-size: 13px;
+                }} 
+                QPushButton:hover {{ background-color: #2980b9; }}
+            """)
+            btn_ai.clicked.connect(self.on_ai_goal_dialog)
+            box.addWidget(btn_ai)
 
         # 2. Кнопка "Оновити"
         btn_refresh = QPushButton("🔄")
@@ -233,6 +258,7 @@ class MainWindow(QMainWindow):
 
         return sort_combo
 
+    # ... (решта методів: create_scroll_area, on_debug_add_time, on_tick, refresh_data, update_quest_list, update_habit_list, on_card_subgoal_checked) ...
     def create_scroll_area(self, layout):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -296,7 +322,6 @@ class MainWindow(QMainWindow):
         try:
             goals = self.service.get_all_goals()
 
-            # --- Сортування Квестів ---
             if self.quest_sort_combo:
                 mode = self.quest_sort_combo.currentText()
                 if "Дедлайн (спочатку старі)" in mode:
@@ -318,7 +343,6 @@ class MainWindow(QMainWindow):
                            alignment=Qt.AlignCenter))
             else:
                 for g in goals:
-                    # Передаємо колбек
                     card = QuestCard(g, self.complete_goal, self.delete_goal, self.edit_goal, self.manage_subgoals,
                                      self.on_card_subgoal_checked)
                     self.quest_list_layout.addWidget(card)
@@ -353,16 +377,13 @@ class MainWindow(QMainWindow):
                            alignment=Qt.AlignCenter))
             else:
                 for g in lt_goals:
-                    # Передаємо self.delete_habit як останній аргумент
                     card = HabitCard(g, simulated_now, self.start_habit, self.finish_habit, self.edit_habit,
                                      self.delete_habit)
                     self.longterm_list_layout.addWidget(card)
         except Exception as e:
             self.longterm_list_layout.addWidget(QLabel(f"Помилка: {e}", styleSheet="color: red;"))
 
-    # --- НОВИЙ МЕТОД ---
     def on_card_subgoal_checked(self, goal, subgoal, is_checked):
-        """Обробляє зміну стану чекбокса підцілі на картці квесту."""
         subgoal.is_completed = is_checked
         self.service.storage.save_goal(goal, self.service.hero_id)
 
@@ -383,6 +404,11 @@ class MainWindow(QMainWindow):
 
     def on_add_longterm(self):
         if AddLongTermDialog(self, self.service).exec_(): self.refresh_data()
+
+    # НОВИЙ МЕТОД: Відкриває діалог AI
+    def on_ai_goal_dialog(self):
+        if AIGoalDialog(self, self.service).exec_():
+            self.refresh_data()
 
     def on_auto_delete_completed(self):
         goals = self.service.get_all_goals()
@@ -425,7 +451,6 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Помилка", f"Не вдалося видалити:\n{str(e)}")
 
-    # --- НОВИЙ МЕТОД ДЛЯ ВИДАЛЕННЯ ЗВИЧКИ ---
     def delete_habit(self, goal):
         try:
             reply = QMessageBox.question(self, 'Видалити?', f"Видалити звичку '{goal.title}'?",
