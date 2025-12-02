@@ -10,7 +10,7 @@ class AIService:
             raise ValueError("API Key not found in .env file")
 
         genai.configure(api_key=Config.GEMINI_API_KEY)
-        # Використовуємо вашу модель
+        # Використовуємо вашу модель, як ви просили
         self.model = genai.GenerativeModel('gemini-2.5-flash')
 
     def generate_subgoals(self, goal_title: str, goal_desc: str, difficulty: Difficulty) -> list:
@@ -48,8 +48,15 @@ class AIService:
             {{"title": "Назва кроку 2", "description": "Опис кроку 2"}}
         ]
         Мова: Українська.
-        
+
         Перевір свою відповідь на галюцинації та актуальність інформації.
+        Для створення максимально якісних та актуальних кроків використовуй наступні авторитетні джерела залежно від тематики цілі:
+        - IT та програмування: [https://roadmap.sh](https://roadmap.sh)
+        - Дизайн (UI/UX, Графічний): [https://roadmap.sh/ux-design](https://roadmap.sh/ux-design) та [https://www.canva.com/design-school/](https://www.canva.com/design-school/)
+        - Маркетинг та реклама: [https://academy.hubspot.com/](https://academy.hubspot.com/) та [https://learning.google/](https://learning.google/)
+        - Вивчення іноземних мов: [https://refold.la/roadmap/](https://refold.la/roadmap/)
+        - Бізнес та стартапи: [https://www.ycombinator.com/library](https://www.ycombinator.com/library)
+        - Фундаментальні науки (Математика, Біологія, тощо): [https://www.khanacademy.org/](https://www.khanacademy.org/)
         """
 
         try:
