@@ -1,3 +1,4 @@
+import random
 import uuid
 from ..models import DamageType
 
@@ -9,7 +10,6 @@ class SkillLogic:
         """Повертає список доступних навичок (словники з даними)."""
         hero = self.get_hero()
 
-        # Базовий набір навичок (однаковий для всіх класів, змінюється лише картинка/назва)
         skills = [
             {
                 "id": 1,
@@ -75,29 +75,46 @@ class SkillLogic:
         enemy = self.get_current_enemy()
         msg = ""
 
-        # Списання мани
+        # --- СПИСАННЯ МАНИ ТА ЗБЕРЕЖЕННЯ ---
         hero.mana -= skill["mana_cost"]
+        self.storage.update_hero(hero)
+
+        # --- РОЗРАХУНОК ШАНСУ ПОДВІЙНОЇ ДІЇ ---
+        # Шанс для скілів = Шанс подвійної атаки спорядження / 2
+        bonuses = self.calculate_equipment_bonuses()
+        base_da_chance = bonuses.get('double_attack_chance', 0)
+        skill_da_chance = base_da_chance // 2
 
         # Логіка ефектів
         if skill["type"] == "damage_phys":
             phys_dmg, _ = self.calculate_hero_damage(hero)
             dmg = int(phys_dmg * skill["value"])
-            msg_atk, _, _ = self.attack_enemy(phys_dmg=dmg, magic_dmg=0)
+            # Передаємо override_da_chance, щоб attack_enemy обробив подвійну атаку
+            msg_atk, _, _ = self.attack_enemy(phys_dmg=dmg, magic_dmg=0, override_da_chance=skill_da_chance)
             msg = f"Використано {skill['name']}!\n{msg_atk}"
 
         elif skill["type"] == "damage_magic":
             _, magic_dmg = self.calculate_hero_damage(hero)
-            # Якщо магічного урону немає (0), беремо від інтелекту хоча б
             if magic_dmg == 0: magic_dmg = hero.int_stat * 2
-
             dmg = int(magic_dmg * skill["value"])
-            msg_atk, _, _ = self.attack_enemy(phys_dmg=0, magic_dmg=dmg)
+            msg_atk, _, _ = self.attack_enemy(phys_dmg=0, magic_dmg=dmg, override_da_chance=skill_da_chance)
             msg = f"Використано {skill['name']}!\n{msg_atk}"
 
         elif skill["type"] == "heal":
             heal = int(hero.max_hp * skill["value"])
+
+            # Власна логіка подвійної дії для лікування
+            is_double_heal = False
+            if skill_da_chance > 0 and random.randint(1, 100) <= skill_da_chance:
+                is_double_heal = True
+                # Додаємо 50% ефекту як "друге спрацювання"
+                heal_bonus = int(heal * 0.5)
+                heal += heal_bonus
+                msg = f"✨ ПОДВІЙНЕ ЛІКУВАННЯ! ✨\nВикористано {skill['name']}! Відновлено {heal} HP (основа + бонус)."
+            else:
+                msg = f"Використано {skill['name']}! Відновлено {heal} HP."
+
             hero.hp = min(hero.hp + heal, hero.max_hp)
-            msg = f"Використано {skill['name']}! Відновлено {heal} HP."
             self.storage.update_hero(hero)
 
         elif skill["type"] == "buff":
@@ -107,7 +124,8 @@ class SkillLogic:
 
         elif skill["type"] == "ultimate":
             dmg = int(enemy.current_hp * skill["value"]) + 1
-            msg_atk, _, _ = self.attack_enemy(phys_dmg=dmg, magic_dmg=0)  # Вважаємо як чистий фіз урон
+            # Ультімейт також може спрацювати двічі (як фіз урон)
+            msg_atk, _, _ = self.attack_enemy(phys_dmg=dmg, magic_dmg=0, override_da_chance=skill_da_chance)
             msg = f"Використано {skill['name']}!\n{msg_atk}"
 
         return msg

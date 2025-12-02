@@ -17,8 +17,7 @@ class CombatLogic:
 
     def _get_total_stats(self, hero):
         """
-        Повертає реальні характеристики (База + Бонуси від речей),
-        включаючи Шанс Подвійної Атаки.
+        Повертає реальні характеристики (База + Бонуси від речей).
         """
         bonuses = self.calculate_equipment_bonuses()
 
@@ -32,15 +31,10 @@ class CombatLogic:
         }
 
     def calculate_hero_damage(self, hero) -> Tuple[int, int]:
-        """
-        Повертає (фіз. урон, маг. урон).
-        """
         stats = self._get_total_stats(hero)
         bonuses = self.calculate_equipment_bonuses()
 
-        # Формула: База + (Сила * 2) + Бонус Зброї
         bonus_phys = (stats['str'] * 2) + bonuses['base_dmg']
-        # Формула: (Інтелект * 2)
         bonus_magic = stats['int'] * 2
 
         total_phys = hero.base_damage + bonus_phys
@@ -61,11 +55,15 @@ class CombatLogic:
         if hero.hp < 0: hero.hp = 0
         return final_damage
 
-    def attack_enemy(self, phys_dmg: int = 0, magic_dmg: int = 0) -> Tuple[str, bool, Optional[str]]:
+    def attack_enemy(self, phys_dmg: int = 0, magic_dmg: int = 0, override_da_chance: int = None) -> Tuple[
+        str, bool, Optional[str]]:
+        """
+        :param override_da_chance: Якщо передано, використовується цей шанс подвійної атаки замість статів героя.
+        """
         hero = self.get_hero()
         enemy = self.get_current_enemy()
 
-        # Авто-розрахунок, якщо параметри не передані (звичайна атака)
+        # Авто-розрахунок для звичайної атаки
         if phys_dmg == 0 and magic_dmg == 0:
             phys_dmg, magic_dmg = self.calculate_hero_damage(hero)
 
@@ -73,40 +71,36 @@ class CombatLogic:
         if hero.buff_multiplier > 1.0:
             phys_dmg = int(phys_dmg * hero.buff_multiplier)
             magic_dmg = int(magic_dmg * hero.buff_multiplier)
-            # Скидаємо бафф
             hero.buff_multiplier = 1.0
             self.storage.update_hero(hero)
 
         # --- ЛОГІКА ПОДВІЙНОЇ АТАКИ ---
-        # Отримуємо загальний шанс з речей
-        stats = self._get_total_stats(hero)
-        da_chance = stats.get('double_attack_chance', 0)
+        if override_da_chance is not None:
+            da_chance = override_da_chance
+        else:
+            stats = self._get_total_stats(hero)
+            da_chance = stats.get('double_attack_chance', 0)
 
         attacks = []
-        # Основна атака
         attacks.append((phys_dmg, magic_dmg))
 
         is_double_attack = False
-        # Перевірка на спрацювання (шанс від 0 до 100)
         if da_chance > 0 and random.randint(1, 100) <= da_chance:
             is_double_attack = True
-            # Додаткова атака: 50% від основної (і фіз, і маг)
+            # Додаткова атака: 50% від основної
             sec_phys = int(phys_dmg * 0.5)
             sec_magic = int(magic_dmg * 0.5)
             attacks.append((sec_phys, sec_magic))
 
-        # Наносимо урон
         total_damage_dealt = 0
-        hits_info = []  # Для тексту логу (напр. "150+50")
+        hits_info = []
 
         for p, m in attacks:
             dmg_sum = p + m
             enemy.current_hp -= dmg_sum
             total_damage_dealt += dmg_sum
-            # Форматуємо рядок для кожного удару: (⚔️Phys + ✨Magic)
             hits_info.append(f"(⚔️{p} + ✨{m})")
 
-        # Формування повідомлення
         damage_details = " + ".join(hits_info)
 
         if is_double_attack:
@@ -114,13 +108,11 @@ class CombatLogic:
         else:
             msg = f"Ви нанесли {total_damage_dealt} урону {damage_details} по {enemy.name}!"
 
-        # Перевірка смерті ворога
         is_dead = False
         loot_info = None
 
         if enemy.current_hp <= 0:
             is_dead = True
-
             hero.current_xp += enemy.reward_xp
             hero.gold += enemy.reward_gold
             loot_info = f"Отримано: {enemy.reward_xp} XP, {enemy.reward_gold} монет."

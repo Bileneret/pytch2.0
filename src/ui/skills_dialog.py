@@ -22,7 +22,6 @@ class SkillsDialog(QDialog):
         layout = QVBoxLayout(self)
 
         hero = self.service.get_hero()
-        # Тепер цей виклик спрацює, бо ми додали SkillLogic до GoalService
         skills = self.service.get_skills()
 
         lbl_header = QLabel(f"Навички: {hero.hero_class.value}")
@@ -88,6 +87,14 @@ class SkillsDialog(QDialog):
 
         scroll.setWidget(container)
         layout.addWidget(scroll)
+
+        # --- ПОПЕРЕДЖЕННЯ ПРО ПОДВІЙНУ АТАКУ ---
+        lbl_info = QLabel("⚠️ Навички мають 50% від вашого шансу на подвійну дію. (включно з лікуванням). При подвійнійній дії бонус від повторного виконання також складає 50%.")
+        lbl_info.setWordWrap(True)
+        lbl_info.setAlignment(Qt.AlignCenter)
+        lbl_info.setStyleSheet("color: #d35400; font-size: 12px; font-weight: bold; padding: 5px; background-color: #fdebd0; border-radius: 5px;")
+        layout.addWidget(lbl_info)
+        # ---------------------------------------
 
         btn_close = QPushButton("Закрити")
         btn_close.clicked.connect(self.accept)
