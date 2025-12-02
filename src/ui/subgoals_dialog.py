@@ -3,9 +3,31 @@ from PyQt5.QtWidgets import (
     QCheckBox, QHBoxLayout, QPushButton, QInputDialog, QMessageBox,
     QLineEdit, QTextEdit, QAbstractItemView, QWidget
 )
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from src.models import SubGoal
 from src.logic import GoalService
+from src.logic.ai_service import AIService
+
+
+class AIWorker(QThread):
+    """Потік для виконання запиту до AI без зависання інтерфейсу."""
+    finished = pyqtSignal(list)
+    error = pyqtSignal(str)
+
+    def __init__(self, goal_title, goal_desc, difficulty):
+        super().__init__()
+        self.goal_title = goal_title
+        self.goal_desc = goal_desc
+        self.difficulty = difficulty
+
+    def run(self):
+        try:
+            service = AIService()
+            # Передаємо складність у сервіс
+            subgoals = service.generate_subgoals(self.goal_title, self.goal_desc, self.difficulty)
+            self.finished.emit(subgoals)
+        except Exception as e:
+            self.error.emit(str(e))
 
 
 class SubGoalInputDialog(QDialog):
@@ -14,13 +36,13 @@ class SubGoalInputDialog(QDialog):
     def __init__(self, parent=None, title_text="", desc_text=""):
         super().__init__(parent)
         self.setWindowTitle("Підціль")
-        self.resize(500, 400)  # Збільшений розмір
+        self.resize(500, 400)
 
         self.layout = QVBoxLayout(self)
         self.layout.setSpacing(10)
 
         # Назва
-        self.layout.addWidget(QLabel("Назва:"))
+        self.layout.addWidget(QLabel("Назва (шрифт +2):"))
         self.title_input = QLineEdit(title_text)
         self.title_input.setStyleSheet("font-size: 14px; font-weight: bold; padding: 5px;")
         self.layout.addWidget(self.title_input)
@@ -56,8 +78,6 @@ class SubGoalInputDialog(QDialog):
 class SubGoalItemWidget(QWidget):
     """
     Кастомний віджет для елемента списку.
-    Відображає чекбокс, назву (більшим шрифтом) та опис (меншим і сірим).
-    Обробляє кліки для виділення рядка в батьківському списку.
     """
 
     def __init__(self, item, list_widget, subgoal, on_toggle):
@@ -74,18 +94,15 @@ class SubGoalItemWidget(QWidget):
 
         # Рядок 1: Чекбокс + Назва
         row1 = QHBoxLayout()
-        row1.setSpacing(10)  # Відступ між чекбоксом і текстом
+        row1.setSpacing(10)
 
-        # Чекбокс (без тексту)
         self.cb = QCheckBox()
         self.cb.setChecked(subgoal.is_completed)
         self.cb.setFixedWidth(20)
         self.cb.stateChanged.connect(self._cb_changed)
 
-        # Назва (шрифт 14px, жирний)
         self.title_lbl = QLabel(subgoal.title)
         self.title_lbl.setStyleSheet("font-size: 14px; font-weight: bold; color: white;")
-        # Пропускаємо кліки крізь лейбл, щоб працював mousePressEvent віджета
         self.title_lbl.setAttribute(Qt.WA_TransparentForMouseEvents)
 
         row1.addWidget(self.cb)
@@ -94,35 +111,24 @@ class SubGoalItemWidget(QWidget):
 
         layout.addLayout(row1)
 
-        # Рядок 2: Опис (під текстом)
+        # Рядок 2: Опис
         if subgoal.description:
             self.desc_lbl = QLabel(subgoal.description)
             self.desc_lbl.setWordWrap(True)
-            # Відступ зліва 30px (20px чекбокс + 10px spacing), шрифт 12px, сірий колір
             self.desc_lbl.setStyleSheet("font-size: 12px; color: #aaaaaa; margin-left: 30px;")
             self.desc_lbl.setAttribute(Qt.WA_TransparentForMouseEvents)
             layout.addWidget(self.desc_lbl)
 
     def _cb_changed(self, state):
-        """Обробка зміни стану чекбокса."""
         self.on_toggle(self.subgoal, state)
 
     def mousePressEvent(self, event):
-        """
-        Обробка кліку по віджету (крім самого чекбокса) для виділення елемента списку.
-        Підтримує Ctrl для множинного вибору.
-        """
         modifiers = event.modifiers()
-
         if modifiers & Qt.ControlModifier:
-            # Інвертуємо виділення при затиснутому Ctrl
             self.item.setSelected(not self.item.isSelected())
         else:
-            # Звичайний клік - скидаємо інші, виділяємо цей
             self.list_widget.clearSelection()
             self.item.setSelected(True)
-
-        # Повертаємо фокус списку
         self.list_widget.setFocus()
         super().mousePressEvent(event)
 
@@ -136,7 +142,6 @@ class SubgoalsDialog(QDialog):
         self.goal = goal
         self.setWindowTitle(f"Підцілі: {goal.title}")
 
-        # 1. Зроблено вікно ще більшим
         self.resize(700, 700)
 
         layout = QVBoxLayout(self)
@@ -147,9 +152,7 @@ class SubgoalsDialog(QDialog):
         layout.addWidget(lbl_header)
 
         self.list_widget = QListWidget()
-        # Вмикаємо розширений режим вибору (для Ctrl+Click)
         self.list_widget.setSelectionMode(QAbstractItemView.ExtendedSelection)
-
         self.list_widget.setStyleSheet("""
             QListWidget {
                 background-color: #2b2b2b;
@@ -194,14 +197,14 @@ class SubgoalsDialog(QDialog):
         btn_box.addWidget(btn_add)
 
         # AI - Синя
-        btn_ai = QPushButton("🤖 AI додавання")
-        btn_ai.setCursor(Qt.PointingHandCursor)
-        btn_ai.setStyleSheet(base_btn_style + """
+        self.btn_ai = QPushButton("🤖 AI генерація")
+        self.btn_ai.setCursor(Qt.PointingHandCursor)
+        self.btn_ai.setStyleSheet(base_btn_style + """
             QPushButton { background-color: #3498db; }
             QPushButton:hover { background-color: #2980b9; }
         """)
-        btn_ai.clicked.connect(self.on_ai_add)
-        btn_box.addWidget(btn_ai)
+        self.btn_ai.clicked.connect(self.on_ai_add)
+        btn_box.addWidget(self.btn_ai)
 
         # Редагувати - Жовта
         btn_edit = QPushButton("✏️ Редагувати")
@@ -242,62 +245,85 @@ class SubgoalsDialog(QDialog):
         layout.addWidget(btn_close)
 
     def on_ai_add(self):
-        """Заглушка для AI функціоналу."""
-        QMessageBox.information(self, "AI Функціонал", "Ця функція знаходиться в розробці 🤖")
+        """Запуск AI генерації."""
+        self.btn_ai.setEnabled(False)
+        self.btn_ai.setText("⏳ Думаю...")
+
+        # Передаємо title, description та difficulty
+        self.ai_worker = AIWorker(self.goal.title, self.goal.description, self.goal.difficulty)
+        self.ai_worker.finished.connect(self.on_ai_success)
+        self.ai_worker.error.connect(self.on_ai_error)
+        self.ai_worker.start()
+
+    def on_ai_success(self, subgoals_data):
+        """AI успішно повернув дані."""
+        self.btn_ai.setEnabled(True)
+        self.btn_ai.setText("🤖 AI генерація")
+
+        if not subgoals_data:
+            QMessageBox.information(self, "AI", "AI не зміг придумати підцілі.")
+            return
+
+        count = len(subgoals_data)
+        reply = QMessageBox.question(
+            self, "AI Пропозиція",
+            f"AI пропонує додати {count} підцілей.\nДодати їх до списку?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+
+        if reply == QMessageBox.Yes:
+            for item in subgoals_data:
+                new_sub = SubGoal(title=item.get('title', 'Без назви'), description=item.get('description', ''))
+                self.goal.add_subgoal(new_sub)
+
+            self.goal.is_completed = False
+            self.service.storage.save_goal(self.goal, self.service.hero_id)
+            self.update_list()
+            QMessageBox.information(self, "Успіх", "Підцілі успішно додано!")
+
+    def on_ai_error(self, error_msg):
+        """Помилка AI."""
+        self.btn_ai.setEnabled(True)
+        self.btn_ai.setText("🤖 AI генерація")
+        QMessageBox.critical(self, "Помилка AI", f"Щось пішло не так:\n{error_msg}\n\nПеревірте API ключ в .env файлі.")
 
     def update_list(self):
         self.list_widget.clear()
         for sub in self.goal.subgoals:
             item = QListWidgetItem()
-
-            # Зберігаємо об'єкт підцілі
             item.setData(Qt.UserRole, sub)
-
-            # Створюємо кастомний віджет
             widget = SubGoalItemWidget(item, self.list_widget, sub, self.toggle_subgoal)
-
-            # Встановлюємо розмір елемента списку відповідно до розміру віджета
             item.setSizeHint(widget.sizeHint())
-
             self.list_widget.addItem(item)
             self.list_widget.setItemWidget(item, widget)
 
     def toggle_subgoal(self, subgoal, state):
         subgoal.is_completed = (state == Qt.Checked)
-
-        # --- АВТОВИКОНАННЯ ЦІЛІ ---
         if self.goal.subgoals and all(s.is_completed for s in self.goal.subgoals):
             if not self.goal.is_completed:
                 self.goal.is_completed = True
-
         self.service.storage.save_goal(self.goal, self.service.hero_id)
 
     def add_subgoal(self):
-        # Використовуємо новий кастомний діалог
         dialog = SubGoalInputDialog(self)
         if dialog.exec_():
             title, desc = dialog.get_data()
             if title:
                 new_sub = SubGoal(title=title, description=desc)
                 self.goal.add_subgoal(new_sub)
-                self.goal.is_completed = False  # Скидаємо виконання батьківської цілі
+                self.goal.is_completed = False
                 self.service.storage.save_goal(self.goal, self.service.hero_id)
                 self.update_list()
 
     def edit_subgoal(self):
         selected_items = self.list_widget.selectedItems()
-
         if not selected_items:
             QMessageBox.warning(self, "Увага", "Оберіть підціль для редагування")
             return
-
-        # Перевірка на множинний вибір
         if len(selected_items) > 1:
-            QMessageBox.warning(self, "Увага",
-                                "У вас вибрано декілька підцілей для редагування. Редагування можливе лише по одній.")
+            QMessageBox.warning(self, "Увага", "Редагування можливе лише по одній підцілі.")
             return
 
-        # Отримуємо об'єкт
         item = selected_items[0]
         sub = item.data(Qt.UserRole)
 
@@ -312,22 +338,18 @@ class SubgoalsDialog(QDialog):
 
     def delete_subgoal(self):
         selected_items = self.list_widget.selectedItems()
-
         if not selected_items:
             QMessageBox.warning(self, "Увага", "Оберіть підціль(лі) для видалення")
             return
 
-        # Підтвердження видалення
         count = len(selected_items)
         msg = f"Видалити {count} підціль?" if count == 1 else f"Видалити {count} підцілей?"
         reply = QMessageBox.question(self, "Видалити", msg, QMessageBox.Yes | QMessageBox.No)
 
         if reply == QMessageBox.Yes:
             subs_to_delete = [item.data(Qt.UserRole) for item in selected_items]
-
             for sub in subs_to_delete:
                 if sub in self.goal.subgoals:
                     self.goal.subgoals.remove(sub)
-
             self.service.storage.save_goal(self.goal, self.service.hero_id)
             self.update_list()
