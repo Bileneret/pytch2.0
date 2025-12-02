@@ -1,0 +1,158 @@
+/* --- ГЛОБАЛЬНІ НАЛАШТУВАННЯ --- */
+QWidget {
+    background-color: #1e1e1e; /* Темний фон (майже чорний) */
+    color: #ecf0f1;            /* Білий текст */
+    font-family: "Segoe UI", sans-serif;
+    font-size: 10pt;
+}
+
+/* --- ВІКНА ТА ДІАЛОГИ --- */
+QMainWindow, QDialog {
+    background-color: #1e1e1e;
+}
+
+/* --- ФРЕЙМИ (ПАНЕЛІ) --- */
+/* Це дефолтний стиль. Ваші HeroPanel/EnemyPanel перепишуть його своїм локальним стилем, де треба */
+QFrame {
+    border: none;
+}
+
+/* --- КНОПКИ (Загальні) --- */
+QPushButton {
+    background-color: #34495e;
+    color: white;
+    border: 1px solid #555;
+    border-radius: 5px;
+    padding: 6px;
+    font-weight: bold;
+}
+QPushButton:hover {
+    background-color: #4e6a85;
+    border: 1px solid #777;
+}
+QPushButton:pressed {
+    background-color: #2c3e50;
+}
+QPushButton:disabled {
+    background-color: #2c2c2c;
+    color: #7f8c8d;
+    border: 1px solid #444;
+}
+
+/* --- ПОЛЯ ВВОДУ --- */
+QLineEdit, QTextEdit, QPlainTextEdit, QSpinBox, QDoubleSpinBox, QDateTimeEdit {
+    background-color: #2d2d2d;
+    color: #f1c40f; /* Жовтуватий текст для вводу */
+    border: 1px solid #555;
+    border-radius: 4px;
+    padding: 4px;
+}
+QLineEdit:focus, QTextEdit:focus {
+    border: 1px solid #3498db;
+}
+
+/* --- СПИСКИ ТА КОМБОБОКСИ --- */
+QComboBox {
+    background-color: #2d2d2d;
+    color: white;
+    border: 1px solid #555;
+    border-radius: 4px;
+    padding: 5px;
+    padding-right: 20px; /* Відступ справа для стрілки */
+}
+
+/* Стиль випадаючого списку (popup) */
+QComboBox QAbstractItemView {
+    background-color: #2d2d2d;
+    color: white;
+    border: 1px solid #555;
+    selection-background-color: #0d6efd;
+    selection-color: white;
+}
+
+/* Кнопка випадання (квадратик справа) */
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 20px;
+    border-left-width: 1px;
+    border-left-color: #555;
+    border-left-style: solid;
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+    background-color: #34495e; /* Трохи інший колір, щоб було видно кнопку */
+}
+
+/* Сама стрілка (малюємо трикутник через прозорі рамки) */
+QComboBox::down-arrow {
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid #ecf0f1; /* Колір стрілки */
+    margin-right: 2px; /* Центрування */
+}
+
+/* Стан, коли список відкритий */
+QComboBox::down-arrow:on {
+    top: 1px;
+    left: 1px;
+}
+
+/* --- ВКЛАДКИ (QTabWidget) --- */
+QTabWidget::pane {
+    border: 1px solid #444;
+    background-color: #1e1e1e;
+}
+QTabBar::tab {
+    background-color: #2d2d2d;
+    color: #bdc3c7;
+    padding: 8px 20px;
+    margin-right: 2px;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+}
+QTabBar::tab:selected {
+    background-color: #34495e;
+    color: #f1c40f; /* Активна вкладка жовта */
+    border-top: 2px solid #f1c40f;
+}
+QTabBar::tab:hover {
+    background-color: #3e3e3e;
+}
+
+/* --- SCROLL BARS (Скрол) --- */
+QScrollBar:vertical {
+    border: none;
+    background: #1e1e1e;
+    width: 10px;
+    margin: 0;
+}
+QScrollBar::handle:vertical {
+    background: #555;
+    min-height: 20px;
+    border-radius: 5px;
+}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+/* --- PROGRESS BAR --- */
+QProgressBar {
+    background-color: #2d2d2d;
+    color: white;
+    border: 1px solid #555;
+    border-radius: 5px;
+    text-align: center;
+}
+/* Колір чанків (заповнення) задається у коді для HP/XP окремо,
+   але тут задамо дефолт */
+QProgressBar::chunk {
+    background-color: #3498db;
+    border-radius: 4px;
+}
+
+/* --- Labels (Мітки) --- */
+QLabel {
+    color: #ecf0f1;
+}

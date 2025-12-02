@@ -17,7 +17,8 @@ class SkillsDialog(QDialog):
         self.service = service
         self.setWindowTitle("Навички Класу 📜")
         self.resize(500, 600)
-        self.setStyleSheet("background-color: white;")
+        # Видалено світлий фон
+        # self.setStyleSheet("background-color: white;")
 
         layout = QVBoxLayout(self)
 
@@ -31,8 +32,11 @@ class SkillsDialog(QDialog):
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setStyleSheet("border: none;")
+        # Прибираємо рамку та фон скролу
+        scroll.setStyleSheet("border: none; background: transparent;")
+
         container = QWidget()
+        container.setStyleSheet("background: transparent;")
         vbox = QVBoxLayout(container)
 
         class_map = {"Воїн": "knight", "Лучник": "archer", "Маг": "mage", "Розбійник": "rogue"}
@@ -42,7 +46,8 @@ class SkillsDialog(QDialog):
 
         for s in skills:
             frame = QFrame()
-            frame.setStyleSheet("background-color: #f0f2f5; border-radius: 8px; border: 1px solid #bdc3c7;")
+            # Темний фон для карток навичок
+            frame.setStyleSheet("background-color: #2d2d2d; border-radius: 8px; border: 1px solid #555;")
             row = QHBoxLayout(frame)
 
             lbl_icon = QLabel()
@@ -58,14 +63,18 @@ class SkillsDialog(QDialog):
 
             text_layout = QVBoxLayout()
             name_lbl = QLabel(f"{s['name']} (Lvl {s['level_req']})")
-            name_lbl.setStyleSheet("font-weight: bold; font-size: 14px;")
+            # Білий текст заголовка
+            name_lbl.setStyleSheet(
+                "font-weight: bold; font-size: 14px; color: white; border: none; background: transparent;")
 
             desc_lbl = QLabel(s['desc'])
             desc_lbl.setWordWrap(True)
-            desc_lbl.setStyleSheet("color: #2c3e50;")
+            # Світло-сірий опис
+            desc_lbl.setStyleSheet("color: #bdc3c7; border: none; background: transparent;")
 
             cost_lbl = QLabel(f"Мана: {s['mana_cost']}")
-            cost_lbl.setStyleSheet("color: #3498db; font-weight: bold; font-size: 10px;")
+            cost_lbl.setStyleSheet(
+                "color: #3498db; font-weight: bold; font-size: 10px; border: none; background: transparent;")
 
             text_layout.addWidget(name_lbl)
             text_layout.addWidget(desc_lbl)
@@ -74,10 +83,10 @@ class SkillsDialog(QDialog):
             status_lbl = QLabel()
             if hero.level >= s['level_req']:
                 status_lbl.setText("✅")
-                status_lbl.setStyleSheet("color: green; font-size: 20px;")
+                status_lbl.setStyleSheet("color: green; font-size: 20px; border: none; background: transparent;")
             else:
                 status_lbl.setText("🔒")
-                status_lbl.setStyleSheet("color: gray; font-size: 20px;")
+                status_lbl.setStyleSheet("color: gray; font-size: 20px; border: none; background: transparent;")
 
             row.addWidget(lbl_icon)
             row.addLayout(text_layout)
@@ -89,10 +98,13 @@ class SkillsDialog(QDialog):
         layout.addWidget(scroll)
 
         # --- ПОПЕРЕДЖЕННЯ ПРО ПОДВІЙНУ АТАКУ ---
-        lbl_info = QLabel("⚠️ Навички мають 50% від вашого шансу на подвійну дію. (включно з лікуванням). При подвійнійній дії бонус від повторного виконання також складає 50%.")
+        lbl_info = QLabel(
+            "⚠️ Навички мають 50% від вашого шансу на подвійну дію. (включно з лікуванням). При подвійнійній дії бонус від повторного виконання також складає 50%.")
         lbl_info.setWordWrap(True)
         lbl_info.setAlignment(Qt.AlignCenter)
-        lbl_info.setStyleSheet("color: #d35400; font-size: 12px; font-weight: bold; padding: 5px; background-color: #fdebd0; border-radius: 5px;")
+        # Темний стиль попередження
+        lbl_info.setStyleSheet(
+            "color: #e67e22; font-size: 12px; font-weight: bold; padding: 5px; border: 1px solid #e67e22; border-radius: 5px;")
         layout.addWidget(lbl_info)
         # ---------------------------------------
 

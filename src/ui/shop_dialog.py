@@ -17,7 +17,7 @@ class ShopDialog(QDialog):
         super().__init__(parent)
         self.service = service
         self.setWindowTitle("Магазин 🛒")
-        self.resize(900, 900)
+        self.resize(950, 950)
         self.setStyleSheet("background-color: white;")
 
         layout = QVBoxLayout(self)

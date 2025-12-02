@@ -34,7 +34,8 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle("Learning Goals RPG 🛡️")
         self.resize(1000, 800)
-        self.setStyleSheet("background-color: #f0f2f5;")
+        # Видалено світлий фон, тепер працює глобальний стиль
+        # self.setStyleSheet("background-color: #f0f2f5;")
 
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
@@ -77,11 +78,7 @@ class MainWindow(QMainWindow):
 
         # 2. НИЖНЯ СЕКЦІЯ
         self.tabs = QTabWidget()
-        self.tabs.setStyleSheet("""
-            QTabWidget::pane { border: 0; }
-            QTabBar::tab { background: #dfe6e9; padding: 10px 20px; margin-right: 2px; border-top-left-radius: 4px; border-top-right-radius: 4px; font-weight: bold; color: #2d3436; }
-            QTabBar::tab:selected { background: white; color: #2980b9; border-top: 3px solid #3498db; }
-        """)
+        # Видалено локальні стилі вкладок, тепер вони беруться з style.qss
 
         self.tab_quests = QWidget()
         l1 = QVBoxLayout(self.tab_quests)
@@ -113,9 +110,6 @@ class MainWindow(QMainWindow):
         try:
             msg = self.service.use_skill(skill_id)
             self.refresh_data()  # Оновити ману/HP/ворога
-
-            # Можна показувати msg у статус-барі або спливаючому вікні,
-            # але щоб не спамити, можна просто виводити в консоль або зробити кастомний тост
             QMessageBox.information(self, "Навичка", msg)
 
         except ValueError as e:
@@ -129,6 +123,7 @@ class MainWindow(QMainWindow):
 
         btn_add = QPushButton(btn_text)
         btn_add.setCursor(Qt.PointingHandCursor)
+        # Зберігаємо стиль кнопок (зелений), як ви просили
         btn_add.setStyleSheet(
             "QPushButton { background-color: #27ae60; color: white; padding: 10px; font-weight: bold; border-radius: 5px; } QPushButton:hover { background-color: #2ecc71; }")
         btn_add.clicked.connect(btn_command)
@@ -136,6 +131,7 @@ class MainWindow(QMainWindow):
         btn_refresh = QPushButton("🔄")
         btn_refresh.setCursor(Qt.PointingHandCursor)
         btn_refresh.setFixedWidth(50)
+        # Зберігаємо стиль кнопок (сірий)
         btn_refresh.setStyleSheet(
             "QPushButton { background-color: #95a5a6; color: white; border-radius: 5px; padding: 10px; font-weight: bold; } QPushButton:hover { background-color: #7f8c8d; }")
         btn_refresh.clicked.connect(self.refresh_data)
@@ -147,10 +143,13 @@ class MainWindow(QMainWindow):
     def create_scroll_area(self, layout):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setStyleSheet(
-            "QScrollArea { border: none; background: #f0f2f5; } QScrollBar:vertical { background: #dfe6e9; width: 10px; border-radius: 5px; }")
+        # Прибрано фон, залишено тільки прибирання рамки
+        scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+
         container = QWidget()
-        container.setStyleSheet("background: #f0f2f5;")
+        # Прибрано світлий фон контейнера
+        container.setStyleSheet("background: transparent;")
+
         vbox = QVBoxLayout(container)
         vbox.setAlignment(Qt.AlignTop)
         vbox.setSpacing(12)

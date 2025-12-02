@@ -23,17 +23,20 @@ class LoginWindow(QWidget):
         self.auth_service = auth_service
         self.setWindowTitle("Вхід 🛡️")
         self.resize(300, 250)
-        self.setStyleSheet("background-color: white;")
+        # Видалено примусовий білий фон
+        # self.setStyleSheet("background-color: white;")
 
         layout = QVBoxLayout(self)
         layout.setSpacing(15)
 
+        # Текст автоматично стане світлим завдяки QSS
         layout.addWidget(QLabel("Введіть Нікнейм вашого Героя:", styleSheet="font-size: 14px; font-weight: bold;"))
 
         self.nick_input = QLineEdit()
         self.nick_input.setPlaceholderText("Нікнейм")
         layout.addWidget(self.nick_input)
 
+        # Стиль кнопок залишено специфічним (синій)
         btn_login = QPushButton("Увійти")
         btn_login.setStyleSheet("background-color: #3498db; color: white; padding: 10px; font-weight: bold;")
         btn_login.clicked.connect(self.do_login)
@@ -42,6 +45,8 @@ class LoginWindow(QWidget):
         layout.addStretch()
 
         layout.addWidget(QLabel("Перший раз тут?"))
+
+        # Стиль кнопок залишено специфічним (зелений)
         btn_create = QPushButton("Створити Персонажа")
         btn_create.setStyleSheet("background-color: #27ae60; color: white; padding: 10px;")
         btn_create.clicked.connect(self.open_creation)
@@ -74,7 +79,8 @@ class CreationWindow(QWidget):
         self.auth_service = auth_service
         self.setWindowTitle("Створення Персонажа ✨")
         self.resize(450, 600)
-        self.setStyleSheet("background-color: white;")
+        # Видалено примусовий білий фон
+        # self.setStyleSheet("background-color: white;")
 
         self.available_images = []
         self.current_image_index = 0
@@ -118,7 +124,8 @@ class CreationWindow(QWidget):
         self.lbl_image = QLabel("Завантаження...")
         self.lbl_image.setFixedSize(200, 200)
         self.lbl_image.setAlignment(Qt.AlignCenter)
-        self.lbl_image.setStyleSheet("border: 2px solid #bdc3c7; border-radius: 10px; background-color: #ecf0f1;")
+        # Прибрано світлий background-color: #ecf0f1; залишено тільки рамку
+        self.lbl_image.setStyleSheet("border: 2px solid #bdc3c7; border-radius: 10px;")
         appearance_layout.addWidget(self.lbl_image)
 
         self.btn_next = QPushButton(">")
@@ -219,5 +226,5 @@ class CreationWindow(QWidget):
             self.auth_service.register(nick, h_class, gender, appearance_path)
             QMessageBox.information(self, "Успіх", "Героя створено! Пригоди починаються!")
             self.creation_successful.emit()
-        except Exception as e:  # <--- ТУТ ЗМІНА: Ловимо всі помилки
+        except Exception as e:
             QMessageBox.critical(self, "Критична помилка", f"Не вдалося створити героя:\n{str(e)}")

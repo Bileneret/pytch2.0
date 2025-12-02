@@ -13,7 +13,8 @@ class AddGoalDialog(QDialog):
         self.service = service
         self.setWindowTitle("Новий Квест ⚔️")
         self.resize(400, 450)
-        self.setStyleSheet("background-color: white;")
+        # Видалено примусовий білий фон
+        # self.setStyleSheet("background-color: white;")
 
         self.layout = QVBoxLayout(self)
 
@@ -37,7 +38,7 @@ class AddGoalDialog(QDialog):
         self.layout.addWidget(self.date_input)
 
         # 4. Складність
-        self.layout.addWidget(QLabel("Складність (Нагорода XP/Gold):"))
+        self.layout.addWidget(QLabel("Складність:"))
         self.diff_input = QComboBox()
         for diff in Difficulty:
             self.diff_input.addItem(f"{diff.name}", diff)
@@ -47,6 +48,7 @@ class AddGoalDialog(QDialog):
         btn_layout = QHBoxLayout()
         btn_save = QPushButton("Створити")
         btn_save.setCursor(Qt.PointingHandCursor)
+        # Зелений стиль для кнопки збереження залишаємо
         btn_save.setStyleSheet("""
             QPushButton { 
                 background-color: #27ae60; 
@@ -61,6 +63,7 @@ class AddGoalDialog(QDialog):
 
         btn_cancel = QPushButton("Скасувати")
         btn_cancel.setCursor(Qt.PointingHandCursor)
+        # Стиль кнопки скасування підтягнеться з глобального QSS
         btn_cancel.clicked.connect(self.reject)
 
         btn_layout.addWidget(btn_save)
@@ -76,8 +79,12 @@ class AddGoalDialog(QDialog):
 
         difficulty = self.diff_input.currentData()
 
+        if not title:
+            QMessageBox.warning(self, "Помилка", "Введіть назву!")
+            return
+
         try:
-            self.service.create_goal(title, desc, deadline, difficulty)
+            self.service.add_goal(title, desc, difficulty, deadline)
             self.accept()
         except Exception as e:
-            QMessageBox.critical(self, "Помилка", f"Не вдалося створити квест:\n{str(e)}")
+            QMessageBox.critical(self, "Помилка", str(e))

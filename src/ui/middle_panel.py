@@ -25,13 +25,14 @@ class MiddlePanel(QFrame):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedHeight(350)
+        self.setFixedHeight(400)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.setup_ui()
 
     def setup_ui(self):
+        # Прибрано фон, залишено тільки рамку
         self.setStyleSheet("""
-            QFrame { background-color: #2c3e50; border-radius: 10px; border: 2px solid #3498db; }
+            QFrame { border: 2px solid #3498db; border-radius: 10px; }
             QLabel { color: white; border: none; background: transparent; }
         """)
 
@@ -72,12 +73,12 @@ class MiddlePanel(QFrame):
         self.btn_inventory.clicked.connect(self.inventory_clicked.emit)
         grid.addWidget(self.btn_inventory, 0, 1)
 
-        # Характеристики (ПРОСТО КНОПКА)
+        # Характеристики (Спрощено: просто кнопка)
         self.btn_stats = self.create_menu_button("Характеристики", "#3498db", "#2980b9")
         self.btn_stats.clicked.connect(self.stats_clicked.emit)
         grid.addWidget(self.btn_stats, 1, 0)
 
-        # Навички (ПРОСТО КНОПКА)
+        # Навички (Спрощено: просто кнопка)
         self.btn_skills = self.create_menu_button("Навички", "#9b59b6", "#8e44ad")
         self.btn_skills.clicked.connect(self.skills_clicked.emit)
         grid.addWidget(self.btn_skills, 1, 1)
@@ -99,6 +100,7 @@ class MiddlePanel(QFrame):
             btn = QPushButton()
             btn.setFixedSize(40, 40)
             btn.setCursor(Qt.PointingHandCursor)
+            # Тут можна залишити локальний стиль, щоб кнопки виглядали як слоти
             btn.setStyleSheet("""
                 QPushButton { background-color: #34495e; border: 1px solid #7f8c8d; border-radius: 5px; }
                 QPushButton:hover { border: 1px solid #9b59b6; }
@@ -116,22 +118,19 @@ class MiddlePanel(QFrame):
         btn.setCursor(Qt.PointingHandCursor)
         btn.setFixedHeight(40)
         btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        # Залишаємо кольорові стилі кнопок
         btn.setStyleSheet(
             f"QPushButton {{ background-color: {color}; color: {text_color}; border: none; border-radius: 5px; font-weight: bold; font-size: 12px; }} QPushButton:hover {{ background-color: {hover_color}; }}")
         return btn
 
     def update_data(self, hero, simulated_time):
-        # Оновлення годинника
         self.lbl_clock.setText(simulated_time.strftime("%H:%M:%S"))
-
         if hero.nickname.lower() == "tester":
             self.btn_debug.show()
         else:
             self.btn_debug.hide()
 
-        # Оновлення іконок навичок (швидкі слоти)
         class_map = {"Воїн": "knight", "Лучник": "archer", "Маг": "mage", "Розбійник": "rogue"}
-        # За замовчуванням knight, якщо клас не знайдено
         cls_name = hero.hero_class.value if hasattr(hero.hero_class, 'value') else "Воїн"
         cls_folder = class_map.get(cls_name, "knight")
 

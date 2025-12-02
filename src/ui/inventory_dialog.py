@@ -19,7 +19,8 @@ class InventoryDialog(QDialog):
         self.service = service
         self.setWindowTitle("Інвентар та Спорядження 🎒")
         self.resize(900, 600)
-        self.setStyleSheet("background-color: white;")
+        # Видалено світлий фон
+        # self.setStyleSheet("background-color: white;")
 
         self.layout = QHBoxLayout(self)
 
@@ -28,14 +29,17 @@ class InventoryDialog(QDialog):
         self.left_layout = QVBoxLayout(self.left_panel)
 
         self.left_layout.addWidget(
-            QLabel("📦 В СУМЦІ", styleSheet="font-weight: bold; font-size: 14px; color: #2c3e50;"))
+            QLabel("📦 В СУМЦІ", styleSheet="font-weight: bold; font-size: 14px; color: #f1c40f;"))
 
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
-        self.scroll_area.setStyleSheet("border: none; background-color: #f0f2f5;")
+        # Прозорий фон, без рамок (щоб зливався з вікном)
+        self.scroll_area.setStyleSheet("border: none; background: transparent;")
 
         self.items_container = QWidget()
-        # Використовуємо GRID замість VBox
+        # Прозорий фон контейнера
+        self.items_container.setStyleSheet("background: transparent;")
+
         self.items_grid = QGridLayout(self.items_container)
         self.items_grid.setAlignment(Qt.AlignTop | Qt.AlignLeft)
         self.items_grid.setSpacing(10)
@@ -48,7 +52,7 @@ class InventoryDialog(QDialog):
         self.right_layout = QVBoxLayout(self.right_panel)
 
         self.right_layout.addWidget(
-            QLabel("🛡️ СПОРЯДЖЕННЯ", styleSheet="font-weight: bold; font-size: 14px; color: #2c3e50;"))
+            QLabel("🛡️ СПОРЯДЖЕННЯ", styleSheet="font-weight: bold; font-size: 14px; color: #f1c40f;"))
 
         self.slots_container = QWidget()
         self.slots_layout = QVBoxLayout(self.slots_container)
@@ -62,20 +66,22 @@ class InventoryDialog(QDialog):
 
         for slot in display_order:
             frame = QFrame()
-            frame.setStyleSheet("background-color: #ecf0f1; border-radius: 5px; border: 1px solid #bdc3c7;")
+            # Темний стиль для слота
+            frame.setStyleSheet("background-color: #2d2d2d; border-radius: 5px; border: 1px solid #555;")
             hbox = QHBoxLayout(frame)
             hbox.setContentsMargins(5, 5, 5, 5)
 
             lbl_slot_name = QLabel(slot.value)
             lbl_slot_name.setFixedWidth(80)
-            lbl_slot_name.setStyleSheet("color: #7f8c8d; font-weight: bold;")
+            lbl_slot_name.setStyleSheet("color: #bdc3c7; font-weight: bold;")  # Світло-сірий
 
             lbl_item_name = QLabel("Пусто")
-            lbl_item_name.setStyleSheet("color: #2c3e50;")
+            lbl_item_name.setStyleSheet("color: white;")  # Білий
 
             btn_unequip = QPushButton("Зняти")
             btn_unequip.setCursor(Qt.PointingHandCursor)
             btn_unequip.setFixedWidth(60)
+            # Червона кнопка "Зняти" залишається
             btn_unequip.setStyleSheet(
                 "background-color: #e74c3c; color: white; border: none; border-radius: 3px; font-weight: bold;")
             btn_unequip.hide()
@@ -102,7 +108,7 @@ class InventoryDialog(QDialog):
         self.lbl_bonuses.setWordWrap(True)
         self.right_layout.addWidget(self.lbl_bonuses)
 
-        # --- ЗМІНА ТУТ: DEBUG BUTTON ЛИШЕ ДЛЯ tester ---
+        # --- DEBUG BUTTON ЛИШЕ ДЛЯ tester ---
         hero = self.service.get_hero()
         if hero.nickname.lower() == "tester":
             btn_debug_add = QPushButton("🎁 Отримати тестові речі")
@@ -143,7 +149,7 @@ class InventoryDialog(QDialog):
                         row += 1
 
             # --- ОНОВЛЕННЯ СЛОТІВ ---
-            total_bonuses = {'str': 0, 'int': 0, 'dex': 0, 'vit': 0, 'def': 0, 'base_dmg': 0}
+            total_bonuses = {'str': 0, 'int': 0, 'dex': 0, 'vit': 0, 'def': 0, 'base_dmg': 0, 'double_attack_chance': 0}
 
             for slot, widgets in self.slot_widgets.items():
                 try:
@@ -157,8 +163,10 @@ class InventoryDialog(QDialog):
                     widgets['btn'].show()
                     widgets['btn'].clicked.connect(
                         lambda checked, i_id=equipped_items[slot].id: self.unequip_item(i_id))
+
+                    # Стиль для АКТИВНОГО слота (Темно-зелений фон)
                     widgets['frame'].setStyleSheet(
-                        "background-color: #d5f5e3; border-radius: 5px; border: 1px solid #2ecc71;")
+                        "background-color: #254e38; border-radius: 5px; border: 1px solid #2ecc71;")
 
                     total_bonuses['str'] += item.bonus_str
                     total_bonuses['int'] += item.bonus_int
@@ -166,11 +174,14 @@ class InventoryDialog(QDialog):
                     total_bonuses['vit'] += item.bonus_vit
                     total_bonuses['def'] += item.bonus_def
                     total_bonuses['base_dmg'] += item.base_dmg
+                    if hasattr(item, 'double_attack_chance'):
+                        total_bonuses['double_attack_chance'] += item.double_attack_chance
                 else:
                     widgets['name_lbl'].setText("Пусто")
                     widgets['btn'].hide()
+                    # Стиль для ПОРОЖНЬОГО слота (Темний)
                     widgets['frame'].setStyleSheet(
-                        "background-color: #ecf0f1; border-radius: 5px; border: 1px solid #bdc3c7;")
+                        "background-color: #2d2d2d; border-radius: 5px; border: 1px solid #555;")
 
             parts = []
             if total_bonuses['str']: parts.append(f"⚔️STR+{total_bonuses['str']}")
@@ -179,6 +190,7 @@ class InventoryDialog(QDialog):
             if total_bonuses['vit']: parts.append(f"🧡VIT+{total_bonuses['vit']}")
             if total_bonuses['def']: parts.append(f"🛡️DEF+{total_bonuses['def']}")
             if total_bonuses['base_dmg']: parts.append(f"💥DMG+{total_bonuses['base_dmg']}")
+            if total_bonuses['double_attack_chance']: parts.append(f"⚡Double+{total_bonuses['double_attack_chance']}%")
 
             bonus_text = "БОНУСИ: " + ", ".join(parts) if parts else "БОНУСИ: Немає"
             self.lbl_bonuses.setText(bonus_text)
@@ -194,15 +206,15 @@ class InventoryDialog(QDialog):
         btn.setFixedSize(80, 80)
         btn.setCursor(Qt.PointingHandCursor)
 
-        # Стиль кнопки
+        # Стиль кнопки в гріде (Темний)
         btn.setStyleSheet("""
             QPushButton {
-                background-color: white;
-                border: 1px solid #bdc3c7;
+                background-color: #34495e;
+                border: 1px solid #555;
                 border-radius: 8px;
             }
             QPushButton:hover {
-                background-color: #ecf0f1;
+                background-color: #3e526a;
                 border: 2px solid #3498db;
             }
         """)
@@ -219,14 +231,11 @@ class InventoryDialog(QDialog):
                 btn.setIcon(icon)
                 btn.setIconSize(QSize(60, 60))
             else:
-                btn.setText("📦")  # Якщо немає картинки
+                btn.setText("📦")
         else:
             btn.setText("📦")
 
-        # Підказка при наведенні
         btn.setToolTip(f"{inv_item.item.name}\n{inv_item.item.item_type.value}")
-
-        # Клік відкриває детальне вікно
         btn.clicked.connect(lambda: self.show_item_details(inv_item))
 
         return btn
@@ -236,7 +245,8 @@ class InventoryDialog(QDialog):
         details = QDialog(self)
         details.setWindowTitle(inv_item.item.name)
         details.resize(300, 400)
-        details.setStyleSheet("background-color: white;")
+        # Видалено білий фон, використовується глобальний стиль
+        # details.setStyleSheet("background-color: white;")
 
         layout = QVBoxLayout(details)
 
@@ -257,13 +267,14 @@ class InventoryDialog(QDialog):
 
         # Назва та тип
         title = QLabel(inv_item.item.name)
-        title.setStyleSheet("font-weight: bold; font-size: 16px; color: #2c3e50;")
+        # Заголовок жовтий
+        title.setStyleSheet("font-weight: bold; font-size: 16px; color: #f1c40f;")
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
 
         type_lbl = QLabel(
             f"{inv_item.item.item_type.value} | {inv_item.item.slot.value if inv_item.item.slot else 'Сміття'}")
-        type_lbl.setStyleSheet("color: gray; font-size: 12px;")
+        type_lbl.setStyleSheet("color: #bdc3c7; font-size: 12px;")  # Сірий
         type_lbl.setAlignment(Qt.AlignCenter)
         layout.addWidget(type_lbl)
 
@@ -276,9 +287,11 @@ class InventoryDialog(QDialog):
         if item.bonus_dex: stats_text += f"🎯 Спритність: +{item.bonus_dex}\n"
         if item.bonus_vit: stats_text += f"🧡 Здоров'я: +{item.bonus_vit}\n"
         if item.bonus_def: stats_text += f"🛡️ Захист: +{item.bonus_def}\n"
+        if hasattr(item, 'double_attack_chance') and item.double_attack_chance:
+            stats_text += f"⚡ Шанс подв. атаки: {item.double_attack_chance}%\n"
 
         stats_lbl = QLabel(stats_text)
-        stats_lbl.setStyleSheet("font-size: 14px; margin-top: 10px;")
+        stats_lbl.setStyleSheet("font-size: 14px; margin-top: 10px; color: white;")
         stats_lbl.setAlignment(Qt.AlignCenter)
         layout.addWidget(stats_lbl)
 

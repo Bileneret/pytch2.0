@@ -11,8 +11,9 @@ class AddLongTermDialog(QDialog):
         super().__init__(parent)
         self.service = service
         self.setWindowTitle("Нова Звичка 📅")
-        self.resize(400, 550)  # Трохи збільшив висоту
-        self.setStyleSheet("background-color: white;")
+        self.resize(400, 550)
+        # Видалено світлий фон
+        # self.setStyleSheet("background-color: white;")
 
         self.layout = QVBoxLayout(self)
         self.layout.setSpacing(12)
@@ -58,6 +59,7 @@ class AddLongTermDialog(QDialog):
 
         # --- ПОПЕРЕДЖЕННЯ ---
         lbl_warning = QLabel("⚠️ Увага: Виконання звички та дедлайни\nрозпочнуться з НАСТУПНОГО дня.")
+        # Залишаємо помаранчевий стиль для виділення
         lbl_warning.setStyleSheet(
             "color: #e67e22; font-weight: bold; font-size: 12px; border: 1px solid #e67e22; padding: 5px; border-radius: 4px;")
         lbl_warning.setAlignment(Qt.AlignCenter)
@@ -66,6 +68,7 @@ class AddLongTermDialog(QDialog):
         # Кнопка
         btn_save = QPushButton("Почати Челендж")
         btn_save.setCursor(Qt.PointingHandCursor)
+        # Зберігаємо фіолетовий стиль кнопки
         btn_save.setStyleSheet("""
             QPushButton { 
                 background-color: #8e44ad; 

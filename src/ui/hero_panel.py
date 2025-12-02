@@ -14,15 +14,19 @@ def get_project_root():
 class HeroPanel(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedSize(200, 350)
+        self.setFixedSize(200, 400)
+
+        # --- ПОВЕРНУЛИ РАМКУ ---
+        # Фон не задаємо (він буде темним з style.qss),
+        # але рамку робимо зеленою, як було раніше.
         self.setStyleSheet("""
             QFrame {
-                background-color: #2c3e50; 
-                border-radius: 10px; 
-                border: 2px solid #2ecc71; 
+                border: 2px solid #2ecc71;
+                border-radius: 10px;
             }
             QLabel { color: white; border: none; background: transparent; }
         """)
+
         self.setup_ui()
 
     def setup_ui(self):
@@ -73,18 +77,16 @@ class HeroPanel(QFrame):
         self.hp_bar.setTextVisible(True)
         self.hp_bar.setAlignment(Qt.AlignCenter)
         self.hp_bar.setStyleSheet("""
-            QProgressBar { border: 1px solid #7f8c8d; border-radius: 5px; background-color: #34495e; text-align: center; color: white; font-weight: bold; font-size: 10px; }
-            QProgressBar::chunk { background-color: #e74c3c; border-radius: 4px; }
+            QProgressBar::chunk { background-color: #e74c3c; border-radius: 3px; }
         """)
         layout.addWidget(self.hp_bar)
 
-        # 7. MANA BAR (НОВЕ)
+        # 7. MANA BAR
         self.mana_bar = QProgressBar()
-        self.mana_bar.setFixedHeight(15)
+        self.mana_bar.setFixedHeight(10)
         self.mana_bar.setTextVisible(True)
         self.mana_bar.setAlignment(Qt.AlignCenter)
         self.mana_bar.setStyleSheet("""
-            QProgressBar { border: 1px solid #7f8c8d; border-radius: 5px; background-color: #34495e; text-align: center; color: white; font-size: 10px; }
             QProgressBar::chunk { background-color: #3498db; border-radius: 2px; }
         """)
         layout.addWidget(self.mana_bar)
@@ -95,15 +97,14 @@ class HeroPanel(QFrame):
         self.xp_bar.setTextVisible(True)
         self.xp_bar.setAlignment(Qt.AlignCenter)
         self.xp_bar.setStyleSheet("""
-            QProgressBar { border: 1px solid #7f8c8d; border-radius: 5px; background-color: #34495e; text-align: center; color: white; font-size: 10px; }
-            QProgressBar::chunk { background-color: #f1c40f; border-radius: 4px; }
+            QProgressBar::chunk { background-color: #f1c40f; border-radius: 3px; }
         """)
         layout.addWidget(self.xp_bar)
 
         layout.addStretch()
 
     def update_data(self, hero):
-        # Avatar ... (без змін)
+        # Avatar
         self.lbl_avatar.setText("🧙‍♂️")
         self.lbl_avatar.setStyleSheet("font-size: 60px; background: transparent;")
         if hero.appearance and "assets" in hero.appearance:
