@@ -30,7 +30,7 @@ class MiddlePanel(QFrame):
         self.setup_ui()
 
     def setup_ui(self):
-        # Прибрано фон, залишено тільки рамку
+        # Рамка панелі
         self.setStyleSheet("""
             QFrame { border: 2px solid #3498db; border-radius: 10px; }
             QLabel { color: white; border: none; background: transparent; }
@@ -44,19 +44,19 @@ class MiddlePanel(QFrame):
         # --- 1. ВЕРХ: Годинник ---
         top_bar = QHBoxLayout()
         top_bar.setAlignment(Qt.AlignCenter)
+
         self.lbl_clock = QLabel("00:00:00")
         self.lbl_clock.setStyleSheet("font-size: 16px; font-family: monospace; font-weight: bold; color: #ecf0f1;")
+
         self.btn_debug = QPushButton("+")
-        self.btn_debug.setFixedSize(20, 20)
+        self.btn_debug.setFixedSize(25, 25)
         self.btn_debug.clicked.connect(self.debug_time_clicked.emit)
         self.btn_debug.hide()
-        self.btn_logout = QPushButton("🚪")
-        self.btn_logout.setFixedSize(30, 30)
-        self.btn_logout.clicked.connect(self.logout_clicked.emit)
+
+        # Кнопку виходу звідси прибрали
+
         top_bar.addWidget(self.lbl_clock)
         top_bar.addWidget(self.btn_debug)
-        top_bar.addSpacing(10)
-        top_bar.addWidget(self.btn_logout)
         main_layout.addLayout(top_bar)
 
         # --- 2. МЕНЮ КНОПОК (2x2) ---
@@ -73,12 +73,12 @@ class MiddlePanel(QFrame):
         self.btn_inventory.clicked.connect(self.inventory_clicked.emit)
         grid.addWidget(self.btn_inventory, 0, 1)
 
-        # Характеристики (Спрощено: просто кнопка)
+        # Характеристики
         self.btn_stats = self.create_menu_button("Характеристики", "#3498db", "#2980b9")
         self.btn_stats.clicked.connect(self.stats_clicked.emit)
         grid.addWidget(self.btn_stats, 1, 0)
 
-        # Навички (Спрощено: просто кнопка)
+        # Навички
         self.btn_skills = self.create_menu_button("Навички", "#9b59b6", "#8e44ad")
         self.btn_skills.clicked.connect(self.skills_clicked.emit)
         grid.addWidget(self.btn_skills, 1, 1)
@@ -100,7 +100,6 @@ class MiddlePanel(QFrame):
             btn = QPushButton()
             btn.setFixedSize(40, 40)
             btn.setCursor(Qt.PointingHandCursor)
-            # Тут можна залишити локальний стиль, щоб кнопки виглядали як слоти
             btn.setStyleSheet("""
                 QPushButton { background-color: #34495e; border: 1px solid #7f8c8d; border-radius: 5px; }
                 QPushButton:hover { border: 1px solid #9b59b6; }
@@ -111,16 +110,37 @@ class MiddlePanel(QFrame):
             self.skills_box.addWidget(btn)
 
         main_layout.addLayout(self.skills_box)
+
+        # Додаємо розтяжку, щоб кнопка виходу була в самому низу
         main_layout.addStretch()
+
+        # --- 4. КНОПКА ВИХОДУ (Внизу) ---
+        self.btn_logout = QPushButton("Вийти з аккаунту")
+        self.btn_logout.setCursor(Qt.PointingHandCursor)
+        self.btn_logout.setFixedWidth(200)  # Фіксуємо ширину, щоб не була на всю панель
+        self.btn_logout.setStyleSheet("""
+            QPushButton { 
+                background-color: #c0392b; 
+                color: white; 
+                font-weight: bold; 
+                border-radius: 5px; 
+                padding: 8px;
+                border: 1px solid #e74c3c;
+            }
+            QPushButton:hover { background-color: #e74c3c; }
+        """)
+        self.btn_logout.clicked.connect(self.logout_clicked.emit)
+
+        # Додаємо кнопку по центру
+        main_layout.addWidget(self.btn_logout, 0, Qt.AlignCenter)
 
     def create_menu_button(self, text, color, hover_color, text_color="white"):
         btn = QPushButton(text)
         btn.setCursor(Qt.PointingHandCursor)
-        btn.setFixedHeight(40)
+        btn.setFixedHeight(50)
         btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        # Залишаємо кольорові стилі кнопок
         btn.setStyleSheet(
-            f"QPushButton {{ background-color: {color}; color: {text_color}; border: none; border-radius: 5px; font-weight: bold; font-size: 12px; }} QPushButton:hover {{ background-color: {hover_color}; }}")
+            f"QPushButton {{ background-color: {color}; color: {text_color}; border: none; border-radius: 5px; font-weight: bold; font-size: 16px; }} QPushButton:hover {{ background-color: {hover_color}; }}")
         return btn
 
     def update_data(self, hero, simulated_time):
