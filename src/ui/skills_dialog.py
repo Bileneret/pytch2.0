@@ -16,7 +16,7 @@ class SkillsDialog(QDialog):
         super().__init__(parent)
         self.service = service
         self.setWindowTitle("Навички Класу 📜")
-        self.resize(500, 600)
+        self.resize(500, 850)
         # Видалено світлий фон
         # self.setStyleSheet("background-color: white;")
 

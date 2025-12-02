@@ -57,7 +57,7 @@ class EnemyWidget(QFrame):
         layout.addLayout(stats_line)
 
         self.hp_bar = QProgressBar()
-        self.hp_bar.setFixedHeight(15)
+        self.hp_bar.setFixedHeight(20)
         self.hp_bar.setTextVisible(True)
         self.hp_bar.setAlignment(Qt.AlignCenter)
         # Залишаємо специфічний колір чанка (червоний для ворога)

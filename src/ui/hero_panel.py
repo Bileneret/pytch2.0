@@ -73,7 +73,7 @@ class HeroPanel(QFrame):
 
         # 6. HP Bar
         self.hp_bar = QProgressBar()
-        self.hp_bar.setFixedHeight(15)
+        self.hp_bar.setFixedHeight(20)
         self.hp_bar.setTextVisible(True)
         self.hp_bar.setAlignment(Qt.AlignCenter)
         self.hp_bar.setStyleSheet("""
@@ -83,17 +83,17 @@ class HeroPanel(QFrame):
 
         # 7. MANA BAR
         self.mana_bar = QProgressBar()
-        self.mana_bar.setFixedHeight(10)
+        self.mana_bar.setFixedHeight(20)
         self.mana_bar.setTextVisible(True)
         self.mana_bar.setAlignment(Qt.AlignCenter)
         self.mana_bar.setStyleSheet("""
-            QProgressBar::chunk { background-color: #3498db; border-radius: 2px; }
+            QProgressBar::chunk { background-color: #3498db; border-radius: 3px; }
         """)
         layout.addWidget(self.mana_bar)
 
         # 8. XP Bar
         self.xp_bar = QProgressBar()
-        self.xp_bar.setFixedHeight(15)
+        self.xp_bar.setFixedHeight(20)
         self.xp_bar.setTextVisible(True)
         self.xp_bar.setAlignment(Qt.AlignCenter)
         self.xp_bar.setStyleSheet("""

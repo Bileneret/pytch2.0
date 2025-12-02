@@ -18,7 +18,8 @@ class ShopDialog(QDialog):
         self.service = service
         self.setWindowTitle("Магазин 🛒")
         self.resize(950, 950)
-        self.setStyleSheet("background-color: white;")
+        # Видалено світлий фон
+        # self.setStyleSheet("background-color: white;")
 
         layout = QVBoxLayout(self)
 
@@ -31,9 +32,11 @@ class ShopDialog(QDialog):
         # Список товарів
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setStyleSheet("border: none; background-color: #f0f2f5;")
+        # Прибираємо фон скролу
+        scroll.setStyleSheet("border: none; background: transparent;")
 
         container = QWidget()
+        container.setStyleSheet("background: transparent;")
         self.grid = QGridLayout(container)
         self.grid.setAlignment(Qt.AlignTop | Qt.AlignLeft)
         self.grid.setSpacing(15)
@@ -44,6 +47,7 @@ class ShopDialog(QDialog):
         # Кнопка закрити
         btn_close = QPushButton("Закрити")
         btn_close.clicked.connect(self.accept)
+        # Стиль підтягнеться з global QSS
         layout.addWidget(btn_close)
 
         self.refresh_ui()
@@ -77,8 +81,13 @@ class ShopDialog(QDialog):
     def create_item_card(self, item):
         frame = QFrame()
         frame.setFixedSize(200, 250)
+        # Темний стиль для карток
         frame.setStyleSheet("""
-            QFrame { background-color: white; border: 1px solid #bdc3c7; border-radius: 8px; }
+            QFrame { 
+                background-color: #2d2d2d; 
+                border: 1px solid #555; 
+                border-radius: 8px; 
+            }
             QFrame:hover { border: 2px solid #3498db; }
         """)
         layout = QVBoxLayout(frame)
@@ -98,14 +107,14 @@ class ShopDialog(QDialog):
 
         # Назва
         name = QLabel(item.name)
-        name.setStyleSheet("font-weight: bold; border: none;")
+        name.setStyleSheet("font-weight: bold; border: none; background: transparent; color: white;")
         name.setWordWrap(True)
         name.setAlignment(Qt.AlignCenter)
         layout.addWidget(name)
 
         # Ціна
         price = QLabel(f"💰 {item.price}")
-        price.setStyleSheet("color: #f39c12; font-weight: bold; border: none;")
+        price.setStyleSheet("color: #f39c12; font-weight: bold; border: none; background: transparent;")
         price.setAlignment(Qt.AlignCenter)
         layout.addWidget(price)
 
@@ -117,13 +126,15 @@ class ShopDialog(QDialog):
         stats_str = " ".join(stats) if stats else "Звичайний"
 
         lbl_stats = QLabel(stats_str)
-        lbl_stats.setStyleSheet("color: gray; font-size: 10px; border: none;")
+        # Світло-сірий колір для другорядної інфи
+        lbl_stats.setStyleSheet("color: #bdc3c7; font-size: 10px; border: none; background: transparent;")
         lbl_stats.setAlignment(Qt.AlignCenter)
         layout.addWidget(lbl_stats)
 
         # Кнопка Купити
         btn_buy = QPushButton("Купити")
         btn_buy.setCursor(Qt.PointingHandCursor)
+        # Зелена кнопка збережена
         btn_buy.setStyleSheet("""
             QPushButton { background-color: #27ae60; color: white; border: none; border-radius: 4px; padding: 5px; font-weight: bold; }
             QPushButton:hover { background-color: #2ecc71; }
