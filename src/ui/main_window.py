@@ -3,19 +3,19 @@ import sys
 from datetime import datetime, timedelta
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QPushButton, QScrollArea, QMessageBox, QTabWidget, QComboBox
+    QLabel, QPushButton, QScrollArea, QMessageBox, QTabWidget, QComboBox, QSizePolicy
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 
 from src.logic import GoalService
 from src.models import Goal, Difficulty, LongTermGoal
+
+# Імпорти діалогів
 from src.ui.dialogs import AddGoalDialog
 from src.ui.longterm_dialog import AddLongTermDialog
 from src.ui.stats_dialog import StatsDialog
 from src.ui.inventory_dialog import InventoryDialog
 from src.ui.shop_dialog import ShopDialog
-
-# Нові імпорти з окремих файлів
 from src.ui.subgoals_dialog import SubgoalsDialog
 from src.ui.edit_goal_dialog import EditGoalDialog
 from src.ui.edit_longterm_dialog import EditLongTermDialog
@@ -79,27 +79,53 @@ class MainWindow(QMainWindow):
 
         self.root_layout.addWidget(top_container)
 
-        # 2. НИЖНЯ СЕКЦІЯ
+        # 2. НИЖНЯ СЕКЦІЯ (ТАБИ)
         self.tabs = QTabWidget()
 
-        # --- Tab Quests ---
+        # --- Tab Quests (Квести) ---
         self.tab_quests = QWidget()
         l1 = QVBoxLayout(self.tab_quests)
         l1.setContentsMargins(0, 10, 0, 0)
-        self.create_tab_controls(l1, "➕ Новий Квест", self.on_add_goal, add_sorting=True, add_cleanup=True)
+
+        # Створюємо панель управління для квестів
+        self.quest_sort_combo = self.create_tab_controls(
+            layout=l1,
+            btn_text="➕ Новий Квест",
+            btn_command=self.on_add_goal,
+            refresh_command=self.refresh_data,
+            sort_items=["Дедлайн (спочатку старі)", "Дедлайн (спочатку нові)", "Пріоритет (Складність)", "Прогрес",
+                        "Дата створення"],
+            on_sort_change=self.update_quest_list,
+            add_cleanup=True,
+            cleanup_command=self.on_auto_delete_completed
+        )
+
         self.quest_list_layout = self.create_scroll_area(l1)
         self.tabs.addTab(self.tab_quests, "⚔️ Квести")
 
-        # --- Tab Habits ---
+        # --- Tab Habits (Звички) ---
         self.tab_longterm = QWidget()
         l2 = QVBoxLayout(self.tab_longterm)
         l2.setContentsMargins(0, 10, 0, 0)
-        self.create_tab_controls(l2, "📅 Нова Звичка", self.on_add_longterm)
+
+        # Створюємо панель управління для звичок (з сортуванням!)
+        self.habit_sort_combo = self.create_tab_controls(
+            layout=l2,
+            btn_text="📅 Нова Звичка",
+            btn_command=self.on_add_longterm,
+            refresh_command=self.refresh_data,
+            sort_items=["Дата старту (нові)", "Дата старту (старі)", "Прогрес (більше)", "Прогрес (менше)",
+                        "Тривалість (довгі)"],
+            on_sort_change=self.update_habit_list,
+            add_cleanup=False  # Для звичок автовидалення зазвичай не потрібне, але можна додати
+        )
+
         self.longterm_list_layout = self.create_scroll_area(l2)
         self.tabs.addTab(self.tab_longterm, "📅 Звички")
 
         self.root_layout.addWidget(self.tabs)
 
+        # Підключення скілів
         self.middle_panel.skills_clicked.connect(self.open_skills_dialog)
         self.middle_panel.skill_used_signal.connect(self.use_skill)
 
@@ -119,97 +145,107 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Skill Error: {e}")
 
-    def create_tab_controls(self, layout, btn_text, btn_command, add_sorting=False, add_cleanup=False):
+    def create_tab_controls(self, layout, btn_text, btn_command, refresh_command, sort_items=None, on_sort_change=None,
+                            add_cleanup=False, cleanup_command=None):
+        """
+        Універсальна функція для створення панелі кнопок.
+        Використовує окремі змінні для розмірів кожної кнопки.
+        """
         box = QHBoxLayout()
         box.setContentsMargins(5, 0, 5, 0)
-        box.setSpacing(10)
+        box.setSpacing(10)  # Відступ між кнопками
 
-        # Вирівнювання висоти: 35px
-        height_style = "height: 35px; max-height: 35px; min-height: 35px;"
+        # --- НАЛАШТУВАННЯ РОЗМІРІВ (Змінюйте значення тут) ---
 
-        # Кнопка "Додати"
+        # 1. Кнопка "Додати" (Зелена)
+        BTN_ADD_HEIGHT = 36
+        BTN_ADD_WIDTH = 140
+
+        # 2. Кнопка "Оновити" (Сіра, квадратна)
+        BTN_REFRESH_HEIGHT = 36
+        BTN_REFRESH_WIDTH = 50
+
+        # 3. Випадаючий список "Сортування"
+        COMBO_SORT_HEIGHT = 36
+        COMBO_SORT_WIDTH = 250
+
+        # 4. Кнопка "Автовидалення" (Червона)
+        BTN_CLEANUP_HEIGHT = 36
+        BTN_CLEANUP_WIDTH = 160
+
+        # --- КІНЕЦЬ НАЛАШТУВАНЬ ---
+
+        # 1. Кнопка "Додати"
         btn_add = QPushButton(btn_text)
         btn_add.setCursor(Qt.PointingHandCursor)
+        # Встановлюємо жорсткі розміри
+        btn_add.setFixedSize(BTN_ADD_WIDTH, BTN_ADD_HEIGHT)
         btn_add.setStyleSheet(f"""
             QPushButton {{ 
                 background-color: #27ae60; 
                 color: white; 
-                padding: 0 15px; 
-                font-weight: bold; 
+                border: none;
                 border-radius: 5px;
-                {height_style}
+                font-weight: bold;
+                font-size: 13px;
             }} 
             QPushButton:hover {{ background-color: #2ecc71; }}
         """)
         btn_add.clicked.connect(btn_command)
         box.addWidget(btn_add)
 
-        # Кнопка "Оновити"
+        # 2. Кнопка "Оновити"
         btn_refresh = QPushButton("🔄")
         btn_refresh.setCursor(Qt.PointingHandCursor)
-        btn_refresh.setFixedWidth(50)
+        btn_refresh.setFixedSize(BTN_REFRESH_WIDTH, BTN_REFRESH_HEIGHT)
         btn_refresh.setStyleSheet(f"""
             QPushButton {{ 
                 background-color: #95a5a6; 
                 color: white; 
-                border-radius: 5px; 
+                border: none;
+                border-radius: 5px;
                 font-weight: bold;
-                {height_style}
+                font-size: 13px;
             }} 
             QPushButton:hover {{ background-color: #7f8c8d; }}
         """)
-        btn_refresh.clicked.connect(self.refresh_data)
+        btn_refresh.clicked.connect(refresh_command)
         box.addWidget(btn_refresh)
 
-        # Сортування
-        if add_sorting:
-            self.sort_combo = QComboBox()
-            self.sort_combo.addItems(
-                ["Дедлайн (спочатку старі)", "Дедлайн (спочатку нові)", "Пріоритет (Складність)", "Прогрес",
-                 "Дата створення"])
-            self.sort_combo.setFixedWidth(220)
-            self.sort_combo.setStyleSheet(f"""
-                QComboBox {{ 
-                    padding-left: 10px;
-                    border: 1px solid #555; 
-                    border-radius: 5px; 
-                    background: #333; 
-                    color: white;
-                    {height_style}
-                }}
-                QComboBox::drop-down {{ border: none; }}
-                QComboBox::down-arrow {{ 
-                    image: none; 
-                    border-left: 2px solid #777; 
-                    border-bottom: 2px solid #777; 
-                    width: 8px; height: 8px; 
-                    margin-right: 10px; 
-                    transform: rotate(-45deg); 
-                }}
-            """)
-            self.sort_combo.currentIndexChanged.connect(self.update_quest_list)
-            box.addWidget(self.sort_combo)
+        # 3. Сортування (ComboBox)
+        sort_combo = None
+        if sort_items:
+            sort_combo = QComboBox()
+            sort_combo.addItems(sort_items)
+            sort_combo.setFixedSize(COMBO_SORT_WIDTH, COMBO_SORT_HEIGHT)
 
-        # Кнопка "Автовидалення" (Червона)
-        if add_cleanup:
+            if on_sort_change:
+                sort_combo.currentIndexChanged.connect(on_sort_change)
+            box.addWidget(sort_combo)
+
+        # 4. Кнопка "Автовидалення"
+        if add_cleanup and cleanup_command:
             btn_cleanup = QPushButton("🗑️ Автовидалення")
             btn_cleanup.setCursor(Qt.PointingHandCursor)
+            btn_cleanup.setFixedSize(BTN_CLEANUP_WIDTH, BTN_CLEANUP_HEIGHT)
             btn_cleanup.setStyleSheet(f"""
                 QPushButton {{ 
                     background-color: #c0392b; 
                     color: white; 
-                    padding: 0 15px; 
-                    font-weight: bold; 
+                    border: none;
                     border-radius: 5px;
-                    {height_style}
+                    font-weight: bold;
+                    font-size: 13px;
                 }} 
                 QPushButton:hover {{ background-color: #e74c3c; }}
             """)
-            btn_cleanup.clicked.connect(self.on_auto_delete_completed)
+            btn_cleanup.clicked.connect(cleanup_command)
             box.addWidget(btn_cleanup)
 
-        box.addStretch()
+        box.addStretch()  # Притискаємо все вліво
         layout.addLayout(box)
+
+        return sort_combo
 
     def create_scroll_area(self, layout):
         scroll = QScrollArea()
@@ -274,9 +310,9 @@ class MainWindow(QMainWindow):
         try:
             goals = self.service.get_all_goals()
 
-            # Сортування
-            if hasattr(self, 'sort_combo'):
-                mode = self.sort_combo.currentText()
+            # --- Сортування Квестів ---
+            if self.quest_sort_combo:
+                mode = self.quest_sort_combo.currentText()
                 if "Дедлайн (спочатку старі)" in mode:
                     goals.sort(key=lambda x: (x.is_completed, x.deadline))
                 elif "Дедлайн (спочатку нові)" in mode:
@@ -309,6 +345,20 @@ class MainWindow(QMainWindow):
         simulated_now = datetime.now() + self.time_offset
         try:
             lt_goals, _ = self.service.get_long_term_goals(custom_now=simulated_now)
+
+            # --- Сортування Звичок ---
+            if self.habit_sort_combo:
+                mode = self.habit_sort_combo.currentText()
+                if "Дата старту (нові)" in mode:
+                    lt_goals.sort(key=lambda x: (x.is_completed, x.start_date), reverse=True)
+                elif "Дата старту (старі)" in mode:
+                    lt_goals.sort(key=lambda x: (x.is_completed, x.start_date))
+                elif "Прогрес (більше)" in mode:
+                    lt_goals.sort(key=lambda x: (x.is_completed, -x.calculate_progress()))
+                elif "Прогрес (менше)" in mode:
+                    lt_goals.sort(key=lambda x: (x.is_completed, x.calculate_progress()))
+                elif "Тривалість (довгі)" in mode:
+                    lt_goals.sort(key=lambda x: (x.is_completed, -x.total_days))
 
             if not lt_goals:
                 self.longterm_list_layout.addWidget(
