@@ -13,13 +13,6 @@ class Difficulty(Enum):
     EPIC = 4
 
 
-class Difficulty(Enum):
-    EASY = 1
-    MEDIUM = 2
-    HARD = 3
-    EPIC = 4
-
-
 class HeroClass(Enum):
     WARRIOR = "Воїн"
     ARCHER = "Лучник"
@@ -94,7 +87,7 @@ class Item:
     bonus_def: int = 0
     base_dmg: int = 0
 
-    # НОВЕ ПОЛЕ: Шанс подвійної атаки (%)
+    # Шанс подвійної атаки (%)
     double_attack_chance: int = 0
 
     price: int = 0
@@ -111,7 +104,6 @@ class InventoryItem:
     id: uuid.UUID = field(default_factory=uuid.uuid4)
 
 
-# ... (Hero, Enemy, Goal, SubGoal, LongTermGoal залишаються без змін) ...
 @dataclass
 class Hero:
     nickname: str
@@ -140,7 +132,7 @@ class Hero:
 
     base_damage: int = 15
 
-    # НОВЕ: Множник наступної атаки (для Skill 4)
+    # Множник наступної атаки (для Skill 4)
     buff_multiplier: float = 1.0
 
     last_login: datetime = field(default_factory=datetime.now)
@@ -169,6 +161,7 @@ class Enemy:
 @dataclass
 class SubGoal:
     title: str
+    description: str = ""  # <--- НОВЕ ПОЛЕ
     is_completed: bool = False
     id: uuid.UUID = field(default_factory=uuid.uuid4)
 
@@ -216,7 +209,7 @@ class LongTermGoal:
     daily_state: str = "pending"
     last_update_date: Optional[datetime] = None
     id: uuid.UUID = field(default_factory=uuid.uuid4)
-    last_checkin: Optional[datetime] = None  # <--- ДОДАНО, щоб фіксити помилку зчитування
+    last_checkin: Optional[datetime] = None
 
     def calculate_progress(self) -> float:
         return (self.current_day / self.total_days) * 100.0

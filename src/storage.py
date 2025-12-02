@@ -64,8 +64,25 @@ class StorageService:
             CREATE TABLE IF NOT EXISTS goals (
                 id TEXT PRIMARY KEY, hero_id TEXT NOT NULL, title TEXT NOT NULL, description TEXT, deadline TEXT, difficulty INTEGER, created_at TEXT, is_completed INTEGER DEFAULT 0, penalty_applied INTEGER DEFAULT 0, FOREIGN KEY (hero_id) REFERENCES heroes (id) ON DELETE CASCADE)
         """)
-        cursor.execute(
-            "CREATE TABLE IF NOT EXISTS sub_goals (id TEXT PRIMARY KEY, goal_id TEXT NOT NULL, title TEXT NOT NULL, is_completed INTEGER DEFAULT 0, FOREIGN KEY (goal_id) REFERENCES goals (id) ON DELETE CASCADE)")
+
+        # Sub Goals (оновлена структура з описом)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS sub_goals (
+                id TEXT PRIMARY KEY, 
+                goal_id TEXT NOT NULL, 
+                title TEXT NOT NULL, 
+                description TEXT DEFAULT '',
+                is_completed INTEGER DEFAULT 0, 
+                FOREIGN KEY (goal_id) REFERENCES goals (id) ON DELETE CASCADE
+            )
+        """)
+
+        # Міграція: Додаємо колонку description, якщо вона відсутня
+        try:
+            cursor.execute("ALTER TABLE sub_goals ADD COLUMN description TEXT DEFAULT ''")
+        except sqlite3.OperationalError:
+            pass
+
         cursor.execute(
             "CREATE TABLE IF NOT EXISTS long_term_goals (id TEXT PRIMARY KEY, hero_id TEXT NOT NULL, title TEXT NOT NULL, description TEXT, total_days INTEGER, start_date TEXT, time_frame TEXT, current_day INTEGER DEFAULT 1, checked_days INTEGER DEFAULT 0, missed_days INTEGER DEFAULT 0, is_completed INTEGER DEFAULT 0, daily_state TEXT DEFAULT 'pending', last_update_date TEXT, FOREIGN KEY (hero_id) REFERENCES heroes (id) ON DELETE CASCADE)")
         cursor.execute(
@@ -94,7 +111,6 @@ class StorageService:
             )
         """)
 
-        # Спроба додати колонку, якщо вона відсутня
         try:
             cursor.execute("ALTER TABLE items_library ADD COLUMN double_attack_chance INTEGER DEFAULT 0")
         except sqlite3.OperationalError:
@@ -116,10 +132,6 @@ class StorageService:
         conn.close()
 
     def seed_items_from_folder(self):
-        """
-        Сканує папку assets/items.
-        Виправлено логіку для щитів та оновлення існуючих предметів.
-        """
         base_path = get_project_root()
         items_path = os.path.join(base_path, "assets", "items")
 
@@ -129,9 +141,7 @@ class StorageService:
         conn = self._get_connection()
         cursor = conn.cursor()
 
-        # Патерн для кинджалів (6 чисел)
         pattern_6 = re.compile(r"^(.*)_(\d+)_(\d+)_(\d+)_(\d+)_(\d+)_(\d+)\.png$", re.IGNORECASE)
-        # Патерн для звичайних речей (5 чисел)
         pattern_5 = re.compile(r"^(.*)_(\d+)_(\d+)_(\d+)_(\d+)_(\d+)\.png$", re.IGNORECASE)
 
         for filename in files:
@@ -161,7 +171,6 @@ class StorageService:
             clean_name = raw_name.replace("_", " ")
             item_type, slot, w_class = self._guess_item_type_and_slot(clean_name)
 
-            # --- РОЗРАХУНОК ЦІНИ ---
             price = 250
             lower = clean_name.lower()
             if "заліз" in lower or "iron" in lower:
@@ -177,7 +186,6 @@ class StorageService:
 
             base_dmg = 0
             if item_type == ItemType.WEAPON:
-                # ВИПРАВЛЕННЯ: Щити не повинні мати базового урону
                 if w_class == WeaponClass.SHIELD:
                     base_dmg = 0
                 else:
@@ -186,7 +194,6 @@ class StorageService:
 
             try:
                 item_id = str(uuid.uuid4())
-                # Спробуємо вставити новий
                 cursor.execute("""
                     INSERT OR IGNORE INTO items_library (
                         id, name, item_type, slot, weapon_class, weapon_hands, damage_type,
@@ -200,8 +207,6 @@ class StorageService:
                     double_attack, price, 1, filename
                 ))
 
-                # ОНОВЛЕННЯ: Примусово оновлюємо характеристики існуючих предметів
-                # Це виправить щити без перестворення бази
                 cursor.execute("""
                     UPDATE items_library 
                     SET base_dmg = ?, double_attack_chance = ?, 
@@ -400,10 +405,13 @@ class StorageService:
                 "INSERT OR REPLACE INTO goals (id, hero_id, title, description, deadline, difficulty, created_at, is_completed, penalty_applied) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (str(goal.id), hero_id, goal.title, goal.description, goal.deadline.isoformat(), goal.difficulty.value,
                  goal.created_at.isoformat(), 1 if goal.is_completed else 0, 1 if goal.penalty_applied else 0))
+
+            # Оновлено збереження підцілей з описом
             cursor.execute("DELETE FROM sub_goals WHERE goal_id = ?", (str(goal.id),))
-            for sub in goal.subgoals: cursor.execute(
-                "INSERT INTO sub_goals (id, goal_id, title, is_completed) VALUES (?, ?, ?, ?)",
-                (str(sub.id), str(goal.id), sub.title, 1 if sub.is_completed else 0))
+            for sub in goal.subgoals:
+                cursor.execute(
+                    "INSERT INTO sub_goals (id, goal_id, title, description, is_completed) VALUES (?, ?, ?, ?, ?)",
+                    (str(sub.id), str(goal.id), sub.title, sub.description, 1 if sub.is_completed else 0))
             conn.commit()
         finally:
             conn.close()
@@ -424,9 +432,15 @@ class StorageService:
             goal.created_at = datetime.fromisoformat(ca_str)
             goal.is_completed = bool(is_comp)
             goal.penalty_applied = bool(is_penalized)
-            cursor.execute("SELECT id, title, is_completed FROM sub_goals WHERE goal_id = ?", (g_id,))
+
+            # Оновлено завантаження підцілей (тепер з описом)
+            # Перевіряємо, чи є колонка description (для сумісності зі старими БД без міграції в момент запиту, хоча ми додали її в init)
+            # Але краще просто вибирати. Якщо стовпчика немає - init_db вже мав це виправити.
+            cursor.execute("SELECT id, title, is_completed, description FROM sub_goals WHERE goal_id = ?", (g_id,))
             for s_row in cursor.fetchall():
-                sub = SubGoal(title=s_row[1])
+                # s_row[3] може бути None, якщо база стара і ми тільки додали стовпчик (хоча DEFAULT '' має допомогти)
+                description_val = s_row[3] if s_row[3] is not None else ""
+                sub = SubGoal(title=s_row[1], description=description_val)
                 sub.id = uuid.UUID(s_row[0])
                 sub.is_completed = bool(s_row[2])
                 goal.add_subgoal(sub)
