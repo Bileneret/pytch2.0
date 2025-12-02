@@ -1,15 +1,16 @@
 from datetime import datetime
-from PyQt5.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QProgressBar, QWidget
+from PyQt5.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QProgressBar, QWidget, QCheckBox
 from PyQt5.QtCore import Qt
 from src.models import Difficulty
 
 
 class QuestCard(QFrame):
-    def __init__(self, goal, on_complete, on_delete, on_edit, on_subgoals):
+    def __init__(self, goal, on_complete, on_delete, on_edit, on_subgoals, on_subgoal_checked):
         super().__init__()
         self.goal = goal
         self.on_edit = on_edit
         self.on_subgoals = on_subgoals
+        self.on_subgoal_checked = on_subgoal_checked  # Новий колбек для чекбоксів
         self.setup_ui(on_complete, on_delete)
 
     def setup_ui(self, on_complete, on_delete):
@@ -71,7 +72,7 @@ class QuestCard(QFrame):
         btn_subs.clicked.connect(lambda: self.on_subgoals(self.goal))
         header.addWidget(btn_subs)
 
-        # Кнопка "Редагувати" (ЖОВТА) - ТЕКСТОМ
+        # Кнопка "Редагувати" (ЖОВТА)
         btn_edit = QPushButton("✏️ Редагувати")
         btn_edit.setCursor(Qt.PointingHandCursor)
         btn_edit.setStyleSheet(base_btn_style + """
@@ -92,7 +93,7 @@ class QuestCard(QFrame):
             btn_ok.clicked.connect(lambda: on_complete(self.goal))
             header.addWidget(btn_ok)
 
-        # Кнопка "Видалити" (Червона іконка)
+        # Кнопка "Видалити"
         btn_del = QPushButton("✕")
         btn_del.setCursor(Qt.PointingHandCursor)
         btn_del.setFixedSize(24, 24)
@@ -117,28 +118,34 @@ class QuestCard(QFrame):
             lbl_desc.setStyleSheet("color: #aaa; font-size: 12px; font-style: italic; margin-bottom: 5px;")
             layout.addWidget(lbl_desc)
 
-        # 3. Прогрес підцілей
+        # 3. Список підцілей (ЧЕКБОКСИ)
         if self.goal.subgoals:
-            sub_layout = QVBoxLayout()
-            sub_layout.setSpacing(2)
+            # Контейнер для підцілей
+            subs_container = QWidget()
+            subs_container.setStyleSheet("background-color: #2d2d2d; border-radius: 4px;")
+            subs_layout = QVBoxLayout(subs_container)
+            subs_layout.setContentsMargins(5, 5, 5, 5)
+            subs_layout.setSpacing(2)
 
-            progress = self.goal.calculate_progress()
-            pb = QProgressBar()
-            pb.setValue(int(progress))
-            pb.setFixedHeight(6)
-            pb.setTextVisible(False)
-            pb.setStyleSheet(f"""
-                QProgressBar {{ border: none; background: #333; border-radius: 3px; }}
-                QProgressBar::chunk {{ background-color: {border}; border-radius: 3px; }}
-            """)
-            sub_layout.addWidget(pb)
+            for sub in self.goal.subgoals:
+                cb = QCheckBox(sub.title)
+                cb.setChecked(sub.is_completed)
+                # Стиль чекбокса: білий текст, трохи менший шрифт
+                # Якщо виконано - можна закреслити текст (text-decoration: line-through)
+                text_style = "text-decoration: line-through; color: #777;" if sub.is_completed else "color: #ddd;"
 
-            done_count = sum(1 for s in self.goal.subgoals if s.is_completed)
-            lbl_subs_count = QLabel(f"Підцілі: {done_count}/{len(self.goal.subgoals)}")
-            lbl_subs_count.setStyleSheet("color: #777; font-size: 10px;")
-            sub_layout.addWidget(lbl_subs_count)
+                cb.setStyleSheet(f"""
+                    QCheckBox {{ font-size: 12px; {text_style} spacing: 5px; margin-left: 5px; border: none; }}
+                    QCheckBox::indicator {{ width: 14px; height: 14px; }}
+                """)
+                cb.setCursor(Qt.PointingHandCursor)
 
-            layout.addLayout(sub_layout)
+                # Підключаємо сигнал (використовуємо lambda для передачі конкретної підцілі)
+                cb.stateChanged.connect(lambda state, s=sub: self.on_subgoal_checked(self.goal, s, state == Qt.Checked))
+
+                subs_layout.addWidget(cb)
+
+            layout.addWidget(subs_container)
 
         # 4. Info
         info = QHBoxLayout()

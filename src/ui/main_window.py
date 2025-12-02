@@ -108,7 +108,7 @@ class MainWindow(QMainWindow):
         l2 = QVBoxLayout(self.tab_longterm)
         l2.setContentsMargins(0, 10, 0, 0)
 
-        # Створюємо панель управління для звичок (з сортуванням!)
+        # Створюємо панель управління для звичок
         self.habit_sort_combo = self.create_tab_controls(
             layout=l2,
             btn_text="📅 Нова Звичка",
@@ -117,7 +117,7 @@ class MainWindow(QMainWindow):
             sort_items=["Дата старту (нові)", "Дата старту (старі)", "Прогрес (більше)", "Прогрес (менше)",
                         "Тривалість (довгі)"],
             on_sort_change=self.update_habit_list,
-            add_cleanup=False  # Для звичок автовидалення зазвичай не потрібне, але можна додати
+            add_cleanup=False
         )
 
         self.longterm_list_layout = self.create_scroll_area(l2)
@@ -147,38 +147,24 @@ class MainWindow(QMainWindow):
 
     def create_tab_controls(self, layout, btn_text, btn_command, refresh_command, sort_items=None, on_sort_change=None,
                             add_cleanup=False, cleanup_command=None):
-        """
-        Універсальна функція для створення панелі кнопок.
-        Використовує окремі змінні для розмірів кожної кнопки.
-        """
         box = QHBoxLayout()
         box.setContentsMargins(5, 0, 5, 0)
-        box.setSpacing(10)  # Відступ між кнопками
+        box.setSpacing(10)
 
-        # --- НАЛАШТУВАННЯ РОЗМІРІВ (Змінюйте значення тут) ---
-
-        # 1. Кнопка "Додати" (Зелена)
+        # --- НАЛАШТУВАННЯ РОЗМІРІВ ---
         BTN_ADD_HEIGHT = 36
         BTN_ADD_WIDTH = 140
-
-        # 2. Кнопка "Оновити" (Сіра, квадратна)
         BTN_REFRESH_HEIGHT = 36
         BTN_REFRESH_WIDTH = 50
-
-        # 3. Випадаючий список "Сортування"
         COMBO_SORT_HEIGHT = 36
-        COMBO_SORT_WIDTH = 250
-
-        # 4. Кнопка "Автовидалення" (Червона)
+        COMBO_SORT_WIDTH = 220
         BTN_CLEANUP_HEIGHT = 36
         BTN_CLEANUP_WIDTH = 160
-
-        # --- КІНЕЦЬ НАЛАШТУВАНЬ ---
+        # -----------------------------
 
         # 1. Кнопка "Додати"
         btn_add = QPushButton(btn_text)
         btn_add.setCursor(Qt.PointingHandCursor)
-        # Встановлюємо жорсткі розміри
         btn_add.setFixedSize(BTN_ADD_WIDTH, BTN_ADD_HEIGHT)
         btn_add.setStyleSheet(f"""
             QPushButton {{ 
@@ -212,13 +198,39 @@ class MainWindow(QMainWindow):
         btn_refresh.clicked.connect(refresh_command)
         box.addWidget(btn_refresh)
 
-        # 3. Сортування (ComboBox)
+        # 3. Сортування
         sort_combo = None
         if sort_items:
             sort_combo = QComboBox()
             sort_combo.addItems(sort_items)
             sort_combo.setFixedSize(COMBO_SORT_WIDTH, COMBO_SORT_HEIGHT)
 
+            sort_combo.setStyleSheet(f"""
+                QComboBox {{ 
+                    padding-left: 10px;
+                    border: 1px solid #555; 
+                    background-color: #333; 
+                    color: white;
+                    border-radius: 5px;
+                    font-weight: bold;
+                    font-size: 13px;
+                }}
+                QComboBox::drop-down {{ border: none; }}
+                QComboBox::down-arrow {{ 
+                    image: none; 
+                    border-left: 2px solid #aaa; 
+                    border-bottom: 2px solid #aaa; 
+                    width: 8px; height: 8px; 
+                    margin-right: 12px; 
+                    transform: rotate(-45deg); 
+                }}
+                QComboBox QAbstractItemView {{
+                    background-color: #333;
+                    color: white;
+                    selection-background-color: #555;
+                    border: 1px solid #555;
+                }}
+            """)
             if on_sort_change:
                 sort_combo.currentIndexChanged.connect(on_sort_change)
             box.addWidget(sort_combo)
@@ -242,7 +254,7 @@ class MainWindow(QMainWindow):
             btn_cleanup.clicked.connect(cleanup_command)
             box.addWidget(btn_cleanup)
 
-        box.addStretch()  # Притискаємо все вліво
+        box.addStretch()
         layout.addLayout(box)
 
         return sort_combo
@@ -332,7 +344,9 @@ class MainWindow(QMainWindow):
                            alignment=Qt.AlignCenter))
             else:
                 for g in goals:
-                    card = QuestCard(g, self.complete_goal, self.delete_goal, self.edit_goal, self.manage_subgoals)
+                    # ТУТ: Передаємо self.on_card_subgoal_checked як новий аргумент
+                    card = QuestCard(g, self.complete_goal, self.delete_goal, self.edit_goal, self.manage_subgoals,
+                                     self.on_card_subgoal_checked)
                     self.quest_list_layout.addWidget(card)
         except Exception as e:
             self.quest_list_layout.addWidget(QLabel(f"Помилка: {e}", styleSheet="color: red;"))
@@ -346,7 +360,6 @@ class MainWindow(QMainWindow):
         try:
             lt_goals, _ = self.service.get_long_term_goals(custom_now=simulated_now)
 
-            # --- Сортування Звичок ---
             if self.habit_sort_combo:
                 mode = self.habit_sort_combo.currentText()
                 if "Дата старту (нові)" in mode:
@@ -371,6 +384,21 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.longterm_list_layout.addWidget(QLabel(f"Помилка: {e}", styleSheet="color: red;"))
 
+    # --- НОВИЙ КОЛБЕК ДЛЯ КАРТОК ---
+    def on_card_subgoal_checked(self, goal, subgoal, is_checked):
+        """Обробляє зміну стану чекбокса підцілі на картці квесту."""
+        subgoal.is_completed = is_checked
+
+        # Автовиконання батьківської цілі, якщо всі підцілі виконані
+        if goal.subgoals and all(s.is_completed for s in goal.subgoals):
+            if not goal.is_completed:
+                goal.is_completed = True
+                # Якщо потрібно одразу видавати нагороду - можна викликати self.complete_goal(goal)
+                # Але це небезпечно робити автоматично без підтвердження користувача, тому просто міняємо статус
+
+        self.service.storage.save_goal(goal, self.service.hero_id)
+        self.refresh_data()  # Оновлюємо UI, щоб зміни (наприклад, зелена рамка цілі) відобразились
+
     # --- ACTIONS ---
     def on_add_goal(self):
         if AddGoalDialog(self, self.service).exec_(): self.refresh_data()
@@ -379,7 +407,6 @@ class MainWindow(QMainWindow):
         if AddLongTermDialog(self, self.service).exec_(): self.refresh_data()
 
     def on_auto_delete_completed(self):
-        """Видаляє всі виконані квести."""
         goals = self.service.get_all_goals()
         completed = [g for g in goals if g.is_completed]
 
