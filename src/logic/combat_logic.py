@@ -28,7 +28,6 @@ class CombatLogic:
             'dex': hero.dex_stat + bonuses['dex'],
             'vit': hero.vit_stat + bonuses['vit'],
             'def': hero.def_stat + bonuses['def'],
-            # Передаємо шанс далі
             'double_attack_chance': bonuses['double_attack_chance']
         }
 
@@ -66,7 +65,7 @@ class CombatLogic:
         hero = self.get_hero()
         enemy = self.get_current_enemy()
 
-        # Авто-розрахунок
+        # Авто-розрахунок, якщо параметри не передані (звичайна атака)
         if phys_dmg == 0 and magic_dmg == 0:
             phys_dmg, magic_dmg = self.calculate_hero_damage(hero)
 
@@ -78,10 +77,44 @@ class CombatLogic:
             hero.buff_multiplier = 1.0
             self.storage.update_hero(hero)
 
-        total_dmg = phys_dmg + magic_dmg
-        enemy.current_hp -= total_dmg
+        # --- ЛОГІКА ПОДВІЙНОЇ АТАКИ ---
+        # Отримуємо загальний шанс з речей
+        stats = self._get_total_stats(hero)
+        da_chance = stats.get('double_attack_chance', 0)
 
-        msg = f"Ви нанесли {total_dmg} урону (⚔️{phys_dmg} + ✨{magic_dmg}) по {enemy.name}!"
+        attacks = []
+        # Основна атака
+        attacks.append((phys_dmg, magic_dmg))
+
+        is_double_attack = False
+        # Перевірка на спрацювання (шанс від 0 до 100)
+        if da_chance > 0 and random.randint(1, 100) <= da_chance:
+            is_double_attack = True
+            # Додаткова атака: 50% від основної (і фіз, і маг)
+            sec_phys = int(phys_dmg * 0.5)
+            sec_magic = int(magic_dmg * 0.5)
+            attacks.append((sec_phys, sec_magic))
+
+        # Наносимо урон
+        total_damage_dealt = 0
+        hits_info = []  # Для тексту логу (напр. "150+50")
+
+        for p, m in attacks:
+            dmg_sum = p + m
+            enemy.current_hp -= dmg_sum
+            total_damage_dealt += dmg_sum
+            # Форматуємо рядок для кожного удару: (⚔️Phys + ✨Magic)
+            hits_info.append(f"(⚔️{p} + ✨{m})")
+
+        # Формування повідомлення
+        damage_details = " + ".join(hits_info)
+
+        if is_double_attack:
+            msg = f"⚔️ ПОДВІЙНА АТАКА! ⚔️\nВи нанесли {total_damage_dealt} урону {damage_details} по {enemy.name}!"
+        else:
+            msg = f"Ви нанесли {total_damage_dealt} урону {damage_details} по {enemy.name}!"
+
+        # Перевірка смерті ворога
         is_dead = False
         loot_info = None
 

@@ -31,7 +31,7 @@ class StorageService:
         conn = self._get_connection()
         cursor = conn.cursor()
 
-        # Heroes (ДОДАНО buff_multiplier)
+        # Heroes
         cursor.execute("""
                     CREATE TABLE IF NOT EXISTS heroes (
                         id TEXT PRIMARY KEY,
@@ -71,7 +71,7 @@ class StorageService:
         cursor.execute(
             "CREATE TABLE IF NOT EXISTS current_enemies (hero_id TEXT PRIMARY KEY, id TEXT NOT NULL, name TEXT, rarity TEXT, level INTEGER, current_hp INTEGER, max_hp INTEGER, damage INTEGER, damage_type TEXT, reward_xp INTEGER, reward_gold INTEGER, drop_chance REAL, image_path TEXT, FOREIGN KEY (hero_id) REFERENCES heroes (id) ON DELETE CASCADE)")
 
-        # Items Library
+        # Items Library - ОНОВЛЕНО: Додано double_attack_chance
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS items_library (
                 id TEXT PRIMARY KEY,
@@ -87,11 +87,18 @@ class StorageService:
                 bonus_vit INTEGER DEFAULT 0,
                 bonus_def INTEGER DEFAULT 0,
                 base_dmg INTEGER DEFAULT 0,
+                double_attack_chance INTEGER DEFAULT 0,
                 price INTEGER DEFAULT 0,
                 level INTEGER DEFAULT 1,
                 image_path TEXT UNIQUE
             )
         """)
+
+        # Спроба додати колонку, якщо вона відсутня (для існуючих БД)
+        try:
+            cursor.execute("ALTER TABLE items_library ADD COLUMN double_attack_chance INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass  # Колонка вже існує
 
         # Inventory
         cursor.execute("""
@@ -111,8 +118,9 @@ class StorageService:
     def seed_items_from_folder(self):
         """
         Сканує папку assets/items.
-        Парсить файли формату: Назва_Предмета_STR_INT_DEX_VIT_DEF_Price.png (або без ціни)
-        Але ціну ми будемо визначати за назвою (рівнем речі).
+        Парсер оновлено для підтримки двох форматів:
+        1. 6 чисел: Name_STR_INT_DEX_VIT_DEF_DoubleAttackChance.png (Кинджали)
+        2. 5 чисел: Name_STR_INT_DEX_VIT_DEF.png (Інше)
         """
         base_path = get_project_root()
         items_path = os.path.join(base_path, "assets", "items")
@@ -123,12 +131,16 @@ class StorageService:
         conn = self._get_connection()
         cursor = conn.cursor()
 
-        # Regex: Name_STR_INT_DEX_VIT_DEF(_OptionalPrice).png
-        # Але ваші файли мають формат Name_S_I_D_V_D.png
-        pattern = re.compile(r"^(.*)_(\d+)_(\d+)_(\d+)_(\d+)_(\d+)(?:_(\d+))?\.png$", re.IGNORECASE)
+        # Патерн для кинджалів (6 чисел)
+        pattern_6 = re.compile(r"^(.*)_(\d+)_(\d+)_(\d+)_(\d+)_(\d+)_(\d+)\.png$", re.IGNORECASE)
+        # Патерн для звичайних речей (5 чисел)
+        pattern_5 = re.compile(r"^(.*)_(\d+)_(\d+)_(\d+)_(\d+)_(\d+)\.png$", re.IGNORECASE)
 
         for filename in files:
-            match = pattern.match(filename)
+            # Спробуємо спочатку 6 чисел (специфічніше)
+            match = pattern_6.match(filename)
+            double_attack = 0
+
             if match:
                 raw_name = match.group(1)
                 str_val = int(match.group(2))
@@ -136,62 +148,71 @@ class StorageService:
                 dex_val = int(match.group(4))
                 vit_val = int(match.group(5))
                 def_val = int(match.group(6))
-
-                # Якщо в назві є 7-ма цифра (ціна), беремо її, інакше рахуємо
-                price_from_name = match.group(7)
-
-                clean_name = raw_name.replace("_", " ")
-                item_type, slot, w_class = self._guess_item_type_and_slot(clean_name)
-
-                # --- РОЗРАХУНОК ЦІНИ ---
-                if price_from_name:
-                    price = int(price_from_name)
+                double_attack = int(match.group(7))  # Останнє число - шанс подвійної атаки
+            else:
+                # Якщо не вийшло, пробуємо 5 чисел
+                match = pattern_5.match(filename)
+                if match:
+                    raw_name = match.group(1)
+                    str_val = int(match.group(2))
+                    int_val = int(match.group(3))
+                    dex_val = int(match.group(4))
+                    vit_val = int(match.group(5))
+                    def_val = int(match.group(6))
                 else:
-                    price = 250  # Base
-                    lower = clean_name.lower()
-                    if "заліз" in lower or "iron" in lower:
-                        price = 750
-                    elif "крилат" in lower or "wing" in lower:
-                        price = 1250
-                    elif "крижан" in lower or "ice" in lower:
-                        price = 1750
-                    elif "вогн" in lower or "fire" in lower:
-                        price = 2500
-                    elif "профес" in lower:
-                        price = 750
+                    continue  # Пропускаємо файли, що не відповідають формату
 
-                base_dmg = 0
-                if item_type == ItemType.WEAPON:
-                    # Евристика урону: сума статів або просто макс
-                    base_dmg = max(str_val, int_val, dex_val) * 2
-                    if base_dmg == 0: base_dmg = 5
+            clean_name = raw_name.replace("_", " ")
+            item_type, slot, w_class = self._guess_item_type_and_slot(clean_name)
 
-                try:
-                    item_id = str(uuid.uuid4())
-                    cursor.execute("""
-                        INSERT OR IGNORE INTO items_library (
-                            id, name, item_type, slot, weapon_class, weapon_hands, damage_type,
-                            bonus_str, bonus_int, bonus_dex, bonus_vit, bonus_def, base_dmg,
-                            price, level, image_path
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (
-                        item_id, clean_name, item_type.value, slot.value,
-                        w_class.value, WeaponHandType.ONE_HANDED.value, DamageType.PHYSICAL.value,
-                        str_val, int_val, dex_val, vit_val, def_val, base_dmg,
-                        price, 1, filename
-                    ))
-                except Exception as e:
-                    print(f"Error adding item {filename}: {e}")
+            # --- РОЗРАХУНОК ЦІНИ ---
+            price = 250  # Base
+            lower = clean_name.lower()
+            if "заліз" in lower or "iron" in lower:
+                price = 750
+            elif "крилат" in lower or "wing" in lower:
+                price = 1250
+            elif "крижан" in lower or "ice" in lower:
+                price = 1750
+            elif "вогн" in lower or "fire" in lower:
+                price = 2500
+            elif "профес" in lower:
+                price = 750
+
+            base_dmg = 0
+            if item_type == ItemType.WEAPON:
+                base_dmg = max(str_val, int_val, dex_val) * 2
+                if base_dmg == 0: base_dmg = 5
+
+            try:
+                item_id = str(uuid.uuid4())
+                # Оновлений запит INSERT з double_attack_chance
+                cursor.execute("""
+                    INSERT OR IGNORE INTO items_library (
+                        id, name, item_type, slot, weapon_class, weapon_hands, damage_type,
+                        bonus_str, bonus_int, bonus_dex, bonus_vit, bonus_def, base_dmg,
+                        double_attack_chance, price, level, image_path
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    item_id, clean_name, item_type.value, slot.value,
+                    w_class.value, WeaponHandType.ONE_HANDED.value, DamageType.PHYSICAL.value,
+                    str_val, int_val, dex_val, vit_val, def_val, base_dmg,
+                    double_attack, price, 1, filename
+                ))
+            except Exception as e:
+                print(f"Error adding item {filename}: {e}")
 
         conn.commit()
         conn.close()
 
     def _guess_item_type_and_slot(self, name: str):
+        # ... (цей метод залишається без змін)
         name_lower = name.lower()
         if any(x in name_lower for x in
                ["меч", "sword", "клинок"]): return ItemType.WEAPON, EquipmentSlot.MAIN_HAND, WeaponClass.SWORD
         if any(
-            x in name_lower for x in ["лук", "bow"]): return ItemType.WEAPON, EquipmentSlot.MAIN_HAND, WeaponClass.BOW
+                x in name_lower for x in
+                ["лук", "bow"]): return ItemType.WEAPON, EquipmentSlot.MAIN_HAND, WeaponClass.BOW
         if any(x in name_lower for x in
                ["посох", "staff"]): return ItemType.WEAPON, EquipmentSlot.MAIN_HAND, WeaponClass.STAFF
         if any(x in name_lower for x in
@@ -206,14 +227,13 @@ class StorageService:
         if any(x in name_lower for x in
                ["штани", "поножі", "legs"]): return ItemType.ARMOR, EquipmentSlot.LEGS, WeaponClass.NONE
         if any(x in name_lower for x in
-               ["чоботи", "взуття", "черевики", "чобіт", "boots"]): return ItemType.ARMOR, EquipmentSlot.FEET, WeaponClass.NONE
+               ["чоботи", "взуття", "черевики", "чобіт",
+                "boots"]): return ItemType.ARMOR, EquipmentSlot.FEET, WeaponClass.NONE
         if any(x in name_lower for x in
                ["рукавиці", "перчатки", "gloves"]): return ItemType.ARMOR, EquipmentSlot.HANDS, WeaponClass.NONE
 
         return ItemType.WEAPON, EquipmentSlot.MAIN_HAND, WeaponClass.NONE
 
-    # ... (Решта методів: add_item, get_inventory, equip, unequip, get_all_library, create_hero, update_hero, etc. - БЕЗ ЗМІН)
-    # Скопіюйте їх з попереднього файлу, щоб не загубити!
     def add_item_to_inventory(self, hero_id: str, item: Item):
         conn = self._get_connection()
         inv_id = uuid.uuid4()
@@ -231,11 +251,30 @@ class StorageService:
         conn.close()
         inventory = []
         for row in rows:
+            # row structure changed due to new column in items_library. Need to map correctly.
+            # inv.id(0), inv.is_equipped(1), lib.id(2), lib.name(3), lib.item_type(4), lib.slot(5),
+            # w_class(6), w_hands(7), dmg_type(8), str(9), int(10), dex(11), vit(12), def(13), base_dmg(14),
+            # double_attack(15), price(16), level(17), image(18)
+
             item_type = next((t for t in ItemType if t.value == row[4]), None)
             slot = next((s for s in EquipmentSlot if s.value == row[5]), None)
-            item = Item(id=uuid.UUID(row[2]), name=row[3], item_type=item_type, slot=slot, bonus_str=row[9],
-                        bonus_int=row[10], bonus_dex=row[11], bonus_vit=row[12], bonus_def=row[13], base_dmg=row[14],
-                        price=row[15], level=row[16], image_path=row[17])
+
+            item = Item(
+                id=uuid.UUID(row[2]),
+                name=row[3],
+                item_type=item_type,
+                slot=slot,
+                bonus_str=row[9],
+                bonus_int=row[10],
+                bonus_dex=row[11],
+                bonus_vit=row[12],
+                bonus_def=row[13],
+                base_dmg=row[14],
+                double_attack_chance=row[15],  # <--- Зчитуємо шанс
+                price=row[16],
+                level=row[17],
+                image_path=row[18]
+            )
             inventory.append(InventoryItem(item=item, is_equipped=bool(row[1]), id=uuid.UUID(row[0])))
         return inventory
 
@@ -262,14 +301,29 @@ class StorageService:
         conn.close()
         items = []
         for row in rows:
+            # Мапінг рядків такий самий як у get_inventory, але без перших двох полів з inventory
             item_type = next((t for t in ItemType if t.value == row[2]), None)
             slot = next((s for s in EquipmentSlot if s.value == row[3]), None)
-            item = Item(id=uuid.UUID(row[0]), name=row[1], item_type=item_type, slot=slot, bonus_str=row[7],
-                        bonus_int=row[8], bonus_dex=row[9], bonus_vit=row[10], bonus_def=row[11], base_dmg=row[12],
-                        price=row[13], level=row[14], image_path=row[15])
+            item = Item(
+                id=uuid.UUID(row[0]),
+                name=row[1],
+                item_type=item_type,
+                slot=slot,
+                bonus_str=row[7],
+                bonus_int=row[8],
+                bonus_dex=row[9],
+                bonus_vit=row[10],
+                bonus_def=row[11],
+                base_dmg=row[12],
+                double_attack_chance=row[13],  # <---
+                price=row[14],
+                level=row[15],
+                image_path=row[16]
+            )
             items.append(item)
         return items
 
+    # ... (Решта методів create_hero, update_hero, save_goal і т.д. залишаються без змін)
     # Auth & Hero
     def create_hero(self, hero: Hero):
         conn = self._get_connection()
@@ -310,11 +364,13 @@ class StorageService:
 
     def _map_row_to_hero(self, row) -> Hero:
         return Hero(
-            id=uuid.UUID(row[0]), nickname=row[1], hero_class=HeroClass(row[2]), gender=Gender(row[3]), appearance=row[4],
-            level=row[5], current_xp=row[6], xp_to_next_level=row[7], gold=row[8], streak_days=row[9], hp=row[10], max_hp=row[11],
+            id=uuid.UUID(row[0]), nickname=row[1], hero_class=HeroClass(row[2]), gender=Gender(row[3]),
+            appearance=row[4],
+            level=row[5], current_xp=row[6], xp_to_next_level=row[7], gold=row[8], streak_days=row[9], hp=row[10],
+            max_hp=row[11],
             stat_points=row[12], str_stat=row[13], int_stat=row[14], dex_stat=row[15],
             vit_stat=row[16], def_stat=row[17], mana=row[18], max_mana=row[19],
-            buff_multiplier=row[20], # Нове поле
+            buff_multiplier=row[20],
             last_login=datetime.fromisoformat(row[21])
         )
 
@@ -444,4 +500,3 @@ class StorageService:
         conn.execute("DELETE FROM current_enemies WHERE hero_id = ?", (hero_id,))
         conn.commit()
         conn.close()
-
