@@ -3,12 +3,11 @@ import sys
 from datetime import datetime, timedelta
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QPushButton, QScrollArea, QMessageBox, QTabWidget, QComboBox, QSizePolicy
+    QMessageBox, QTabWidget
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 
 from src.logic import GoalService
-from src.models import Goal, Difficulty, LongTermGoal
 
 # Імпорти діалогів
 from src.ui.dialogs import AddGoalDialog
@@ -21,12 +20,12 @@ from src.ui.edit_goal_dialog import EditGoalDialog
 from src.ui.edit_longterm_dialog import EditLongTermDialog
 from src.ui.ai_goal_dialog import AIGoalDialog
 
-# Імпорт панелей
+# Імпорт панелей та вкладок
 from src.ui.hero_panel import HeroPanel
 from src.ui.middle_panel import MiddlePanel
 from src.ui.enemy_panel import EnemyWidget
-from src.ui.cards import QuestCard, HabitCard
-
+from src.ui.tabs.quest_tab import QuestTab
+from src.ui.tabs.habit_tab import HabitTab
 from src.ui.skills_dialog import SkillsDialog
 
 
@@ -83,215 +82,18 @@ class MainWindow(QMainWindow):
         # 2. НИЖНЯ СЕКЦІЯ (ТАБИ)
         self.tabs = QTabWidget()
 
-        # --- Tab Quests (Квести) ---
-        self.tab_quests = QWidget()
-        l1 = QVBoxLayout(self.tab_quests)
-        l1.setContentsMargins(0, 10, 0, 0)
+        # Використовуємо нові класи вкладок
+        self.quest_tab = QuestTab(self.tabs, self)
+        self.tabs.addTab(self.quest_tab, "⚔️ Квести")
 
-        # Створюємо панель управління для квестів
-        self.quest_sort_combo = self.create_tab_controls(
-            layout=l1,
-            btn_text="➕ Новий Квест",
-            btn_command=self.on_add_goal,
-            refresh_command=self.refresh_data,
-            sort_items=["Дедлайн (спочатку старі)", "Дедлайн (спочатку нові)", "Пріоритет (Складність)", "Прогрес",
-                        "Дата створення"],
-            on_sort_change=self.update_quest_list,
-            add_cleanup=True,
-            cleanup_command=self.on_auto_delete_completed,
-            add_ai_btn=True,
-            add_search=True  # <--- Додаємо кнопку пошуку
-        )
-
-        self.quest_list_layout = self.create_scroll_area(l1)
-        self.tabs.addTab(self.tab_quests, "⚔️ Квести")
-
-        # --- Tab Habits (Звички) ---
-        self.tab_longterm = QWidget()
-        l2 = QVBoxLayout(self.tab_longterm)
-        l2.setContentsMargins(0, 10, 0, 0)
-
-        # Створюємо панель управління для звичок
-        self.habit_sort_combo = self.create_tab_controls(
-            layout=l2,
-            btn_text="📅 Нова Звичка",
-            btn_command=self.on_add_longterm,
-            refresh_command=self.refresh_data,
-            sort_items=["Дата старту (нові)", "Дата старту (старі)", "Прогрес (більше)", "Прогрес (менше)",
-                        "Тривалість (довгі)"],
-            on_sort_change=self.update_habit_list,
-            add_cleanup=False,
-            add_search=False  # Поки тільки для квестів, можна увімкнути й тут
-        )
-
-        self.longterm_list_layout = self.create_scroll_area(l2)
-        self.tabs.addTab(self.tab_longterm, "📅 Звички")
+        self.habit_tab = HabitTab(self.tabs, self)
+        self.tabs.addTab(self.habit_tab, "📅 Звички")
 
         self.root_layout.addWidget(self.tabs)
 
         # Підключення скілів
         self.middle_panel.skills_clicked.connect(self.open_skills_dialog)
         self.middle_panel.skill_used_signal.connect(self.use_skill)
-
-    def open_skills_dialog(self):
-        try:
-            SkillsDialog(self, self.service).exec_()
-        except Exception as e:
-            print(e)
-
-    def use_skill(self, skill_id):
-        try:
-            msg = self.service.use_skill(skill_id)
-            self.refresh_data()
-            QMessageBox.information(self, "Навичка", msg)
-        except ValueError as e:
-            QMessageBox.warning(self, "Неможливо", str(e))
-        except Exception as e:
-            print(f"Skill Error: {e}")
-
-    def create_tab_controls(self, layout, btn_text, btn_command, refresh_command, sort_items=None, on_sort_change=None,
-                            add_cleanup=False, cleanup_command=None, add_ai_btn=False, add_search=False):
-        box = QHBoxLayout()
-        box.setContentsMargins(5, 0, 5, 0)
-        box.setSpacing(10)
-
-        # --- НАЛАШТУВАННЯ РОЗМІРІВ ---
-        BTN_ADD_HEIGHT = 36
-        BTN_ADD_WIDTH = 140
-        BTN_AI_WIDTH = 100
-        BTN_REFRESH_HEIGHT = 36
-        BTN_REFRESH_WIDTH = 50
-        COMBO_SORT_HEIGHT = 36
-        COMBO_SORT_WIDTH = 220
-        BTN_SEARCH_WIDTH = 100  # Ширина кнопки пошуку
-        BTN_CLEANUP_HEIGHT = 36
-        BTN_CLEANUP_WIDTH = 160
-        # -----------------------------
-
-        # 1. Кнопка "Додати"
-        btn_add = QPushButton(btn_text)
-        btn_add.setCursor(Qt.PointingHandCursor)
-        btn_add.setFixedSize(BTN_ADD_WIDTH, BTN_ADD_HEIGHT)
-        btn_add.setStyleSheet(f"""
-            QPushButton {{ 
-                background-color: #27ae60; 
-                color: white; 
-                border: none;
-                border-radius: 5px;
-                font-weight: bold;
-                font-size: 13px;
-            }} 
-            QPushButton:hover {{ background-color: #2ecc71; }}
-        """)
-        btn_add.clicked.connect(btn_command)
-        box.addWidget(btn_add)
-
-        # 1.5. Кнопка "ШІ цілі"
-        if add_ai_btn:
-            btn_ai = QPushButton("🤖 ШІ ціль")
-            btn_ai.setCursor(Qt.PointingHandCursor)
-            btn_ai.setFixedSize(BTN_AI_WIDTH, BTN_ADD_HEIGHT)
-            btn_ai.setStyleSheet(f"""
-                QPushButton {{ 
-                    background-color: #3498db; 
-                    color: white; 
-                    border: none;
-                    border-radius: 5px;
-                    font-weight: bold;
-                    font-size: 13px;
-                }} 
-                QPushButton:hover {{ background-color: #2980b9; }}
-            """)
-            btn_ai.clicked.connect(self.on_ai_goal_dialog)
-            box.addWidget(btn_ai)
-
-        # 2. Кнопка "Оновити"
-        btn_refresh = QPushButton("🔄")
-        btn_refresh.setCursor(Qt.PointingHandCursor)
-        btn_refresh.setFixedSize(BTN_REFRESH_WIDTH, BTN_REFRESH_HEIGHT)
-        btn_refresh.setStyleSheet(f"""
-            QPushButton {{ 
-                background-color: #95a5a6; 
-                color: white; 
-                border: none;
-                border-radius: 5px;
-                font-weight: bold;
-                font-size: 13px;
-            }} 
-            QPushButton:hover {{ background-color: #7f8c8d; }}
-        """)
-        btn_refresh.clicked.connect(refresh_command)
-        box.addWidget(btn_refresh)
-
-        # 3. Сортування
-        sort_combo = None
-        if sort_items:
-            sort_combo = QComboBox()
-            sort_combo.addItems(sort_items)
-            sort_combo.setFixedSize(COMBO_SORT_WIDTH, COMBO_SORT_HEIGHT)
-
-            if on_sort_change:
-                sort_combo.currentIndexChanged.connect(on_sort_change)
-            box.addWidget(sort_combo)
-
-        # 3.5. Кнопка "Пошук" (Заглушка)
-        if add_search:
-            btn_search = QPushButton("🔍 Пошук")
-            btn_search.setCursor(Qt.PointingHandCursor)
-            btn_search.setFixedSize(BTN_SEARCH_WIDTH, BTN_ADD_HEIGHT)  # Висота така ж, як у інших
-            btn_search.setStyleSheet(f"""
-                QPushButton {{ 
-                    background-color: #9b59b6; 
-                    color: white; 
-                    border: none;
-                    border-radius: 5px;
-                    font-weight: bold;
-                    font-size: 13px;
-                }} 
-                QPushButton:hover {{ background-color: #8e44ad; }}
-            """)
-            btn_search.clicked.connect(lambda: QMessageBox.information(self, "Інфо", "Функціонал пошуку у розробці 🛠️"))
-            box.addWidget(btn_search)
-
-        # 4. Кнопка "Автовидалення"
-        if add_cleanup and cleanup_command:
-            btn_cleanup = QPushButton("🗑️ Автовидалення")
-            btn_cleanup.setCursor(Qt.PointingHandCursor)
-            btn_cleanup.setFixedSize(BTN_CLEANUP_WIDTH, BTN_CLEANUP_HEIGHT)
-            btn_cleanup.setStyleSheet(f"""
-                QPushButton {{ 
-                    background-color: #c0392b; 
-                    color: white; 
-                    border: none;
-                    border-radius: 5px;
-                    font-weight: bold;
-                    font-size: 13px;
-                }} 
-                QPushButton:hover {{ background-color: #e74c3c; }}
-            """)
-            btn_cleanup.clicked.connect(cleanup_command)
-            box.addWidget(btn_cleanup)
-
-        box.addStretch()
-        layout.addLayout(box)
-
-        return sort_combo
-
-    def create_scroll_area(self, layout):
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
-
-        container = QWidget()
-        container.setStyleSheet("background: transparent;")
-
-        vbox = QVBoxLayout(container)
-        vbox.setAlignment(Qt.AlignTop)
-        vbox.setSpacing(12)
-        vbox.setContentsMargins(5, 10, 5, 10)
-        scroll.setWidget(container)
-        layout.addWidget(scroll)
-        return vbox
 
     # --- LOGIC ---
     def on_debug_add_time(self):
@@ -329,112 +131,36 @@ class MainWindow(QMainWindow):
         except ValueError:
             pass
 
-        self.update_quest_list()
-        self.update_habit_list()
+        # Оновлюємо списки через методи вкладок
+        if hasattr(self, 'quest_tab'):
+            self.quest_tab.update_list()
+        if hasattr(self, 'habit_tab'):
+            self.habit_tab.update_list()
 
-    def update_quest_list(self):
-        while self.quest_list_layout.count():
-            child = self.quest_list_layout.takeAt(0)
-            if child.widget(): child.widget().deleteLater()
+    # --- МЕТОДИ КАРТОК И ДЕЙСТВИЙ ---
+    # Эти методы остаются в MainWindow, так как они управляют общей логикой приложения
 
-        try:
-            goals = self.service.get_all_goals()
-
-            # --- Сортування Квестів ---
-            if self.quest_sort_combo:
-                mode = self.quest_sort_combo.currentText()
-                if "Дедлайн (спочатку старі)" in mode:
-                    goals.sort(key=lambda x: (x.is_completed, x.deadline))
-                elif "Дедлайн (спочатку нові)" in mode:
-                    goals.sort(key=lambda x: (x.is_completed, x.deadline), reverse=True)
-                elif "Пріоритет" in mode:
-                    goals.sort(key=lambda x: (x.is_completed, -x.difficulty.value))
-                elif "Прогрес" in mode:
-                    goals.sort(key=lambda x: (x.is_completed, -x.calculate_progress()))
-                elif "Дата створення" in mode:
-                    goals.sort(key=lambda x: (x.is_completed, x.created_at), reverse=True)
-            else:
-                goals.sort(key=lambda x: (x.is_completed, x.deadline))
-
-            if not goals:
-                self.quest_list_layout.addWidget(
-                    QLabel("Немає активних квестів.", styleSheet="color: #7f8c8d; font-size: 14px;",
-                           alignment=Qt.AlignCenter))
-            else:
-                for g in goals:
-                    # Передаємо НОВИЙ колбек
-                    card = QuestCard(g, self.complete_goal, self.delete_goal, self.edit_goal, self.manage_subgoals,
-                                     self.on_card_subgoal_checked)
-                    self.quest_list_layout.addWidget(card)
-        except Exception as e:
-            self.quest_list_layout.addWidget(QLabel(f"Помилка: {e}", styleSheet="color: red;"))
-
-    def update_habit_list(self):
-        while self.longterm_list_layout.count():
-            child = self.longterm_list_layout.takeAt(0)
-            if child.widget(): child.widget().deleteLater()
-
-        simulated_now = datetime.now() + self.time_offset
-        try:
-            lt_goals, _ = self.service.get_long_term_goals(custom_now=simulated_now)
-
-            if self.habit_sort_combo:
-                mode = self.habit_sort_combo.currentText()
-                if "Дата старту (нові)" in mode:
-                    lt_goals.sort(key=lambda x: (x.is_completed, x.start_date), reverse=True)
-                elif "Дата старту (старі)" in mode:
-                    lt_goals.sort(key=lambda x: (x.is_completed, x.start_date))
-                elif "Прогрес (більше)" in mode:
-                    lt_goals.sort(key=lambda x: (x.is_completed, -x.calculate_progress()))
-                elif "Прогрес (менше)" in mode:
-                    lt_goals.sort(key=lambda x: (x.is_completed, x.calculate_progress()))
-                elif "Тривалість (довгі)" in mode:
-                    lt_goals.sort(key=lambda x: (x.is_completed, -x.total_days))
-
-            if not lt_goals:
-                self.longterm_list_layout.addWidget(
-                    QLabel("Немає активних звичок.", styleSheet="color: #7f8c8d; font-size: 14px;",
-                           alignment=Qt.AlignCenter))
-            else:
-                for g in lt_goals:
-                    # Передаємо self.delete_habit як останній аргумент
-                    card = HabitCard(g, simulated_now, self.start_habit, self.finish_habit, self.edit_habit,
-                                     self.delete_habit)
-                    self.longterm_list_layout.addWidget(card)
-        except Exception as e:
-            self.longterm_list_layout.addWidget(QLabel(f"Помилка: {e}", styleSheet="color: red;"))
-
-    # --- НОВИЙ МЕТОД ---
     def on_card_subgoal_checked(self, goal, subgoal, is_checked):
-        """Обробляє зміну стану чекбокса підцілі на картці квесту."""
-        # 1. Зберігаємо стан підцілі
         subgoal.is_completed = is_checked
         self.service.storage.save_goal(goal, self.service.hero_id)
 
-        # 2. Логіка завершення / відкату
         if is_checked:
-            # Якщо всі підцілі виконані і сама ціль ще ні -> завершуємо з нагородою
             if not goal.is_completed and goal.subgoals and all(s.is_completed for s in goal.subgoals):
                 msg = self.service.complete_goal(goal)
                 QMessageBox.information(self, "Квест виконано!", f"Всі підцілі завершено!\n{msg}")
-
         else:
-            # Якщо галочку зняли, а ціль була виконана -> відкат (знімаємо статус, забираємо XP/Gold)
             if goal.is_completed:
                 msg = self.service.undo_complete_goal(goal)
                 QMessageBox.warning(self, "Відміна виконання", f"Ціль повернута до активних.\n{msg}")
 
-        # 3. Оновлюємо вигляд карток
         self.refresh_data()
 
-    # --- ACTIONS ---
     def on_add_goal(self):
         if AddGoalDialog(self, self.service).exec_(): self.refresh_data()
 
     def on_add_longterm(self):
         if AddLongTermDialog(self, self.service).exec_(): self.refresh_data()
 
-    # НОВИЙ МЕТОД: Відкриває діалог AI
     def on_ai_goal_dialog(self):
         if AIGoalDialog(self, self.service).exec_():
             self.refresh_data()
@@ -480,7 +206,6 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Помилка", f"Не вдалося видалити:\n{str(e)}")
 
-    # --- НОВИЙ МЕТОД ДЛЯ ВИДАЛЕННЯ ЗВИЧКИ ---
     def delete_habit(self, goal):
         try:
             reply = QMessageBox.question(self, 'Видалити?', f"Видалити звичку '{goal.title}'?",
@@ -519,6 +244,22 @@ class MainWindow(QMainWindow):
             self.refresh_data()
         except Exception as e:
             QMessageBox.critical(self, "Помилка", f"Помилка завершення:\n{str(e)}")
+
+    def open_skills_dialog(self):
+        try:
+            SkillsDialog(self, self.service).exec_()
+        except Exception as e:
+            print(e)
+
+    def use_skill(self, skill_id):
+        try:
+            msg = self.service.use_skill(skill_id)
+            self.refresh_data()
+            QMessageBox.information(self, "Навичка", msg)
+        except ValueError as e:
+            QMessageBox.warning(self, "Неможливо", str(e))
+        except Exception as e:
+            print(f"Skill Error: {e}")
 
     def open_stats_dialog(self):
         try:
