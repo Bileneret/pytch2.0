@@ -42,7 +42,7 @@ class SubGoalInputDialog(QDialog):
         self.layout.setSpacing(10)
 
         # Назва
-        self.layout.addWidget(QLabel("Назва (шрифт +2):"))
+        self.layout.addWidget(QLabel("Назва:"))
         self.title_input = QLineEdit(title_text)
         self.title_input.setStyleSheet("font-size: 14px; font-weight: bold; padding: 5px;")
         self.layout.addWidget(self.title_input)

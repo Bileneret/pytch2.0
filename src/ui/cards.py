@@ -130,8 +130,6 @@ class QuestCard(QFrame):
             for sub in self.goal.subgoals:
                 cb = QCheckBox(sub.title)
                 cb.setChecked(sub.is_completed)
-                # Стиль чекбокса: білий текст, трохи менший шрифт
-                # Якщо виконано - можна закреслити текст (text-decoration: line-through)
                 text_style = "text-decoration: line-through; color: #777;" if sub.is_completed else "color: #ddd;"
 
                 cb.setStyleSheet(f"""
@@ -139,13 +137,35 @@ class QuestCard(QFrame):
                     QCheckBox::indicator {{ width: 14px; height: 14px; }}
                 """)
                 cb.setCursor(Qt.PointingHandCursor)
-
-                # Підключаємо сигнал (використовуємо lambda для передачі конкретної підцілі)
                 cb.stateChanged.connect(lambda state, s=sub: self.on_subgoal_checked(self.goal, s, state == Qt.Checked))
-
                 subs_layout.addWidget(cb)
 
             layout.addWidget(subs_container)
+
+            # --- НОВЕ: Шкала прогресу для підцілей ---
+            progress_val = int(self.goal.calculate_progress())
+            pb = QProgressBar()
+            pb.setValue(progress_val)
+            pb.setFormat("%p%")  # Показує відсотки, наприклад 30%
+            pb.setTextVisible(True)
+            pb.setFixedHeight(14)
+            pb.setStyleSheet(f"""
+                QProgressBar {{
+                    border: 1px solid #555;
+                    border-radius: 7px;
+                    background-color: #1e1e1e;
+                    color: white;
+                    text-align: center;
+                    font-size: 10px;
+                    font-weight: bold;
+                }}
+                QProgressBar::chunk {{
+                    background-color: {border}; /* Колір залежить від складності */
+                    border-radius: 7px;
+                }}
+            """)
+            layout.addWidget(pb)
+            # ------------------------------------------
 
         # 4. Info
         info = QHBoxLayout()
@@ -153,14 +173,12 @@ class QuestCard(QFrame):
             QLabel(f"{self.goal.difficulty.name}",
                    styleSheet="font-size: 11px; color: #bdc3c7; border: 1px solid #444; padding: 2px 4px; border-radius: 3px;"))
 
-        # ВИПРАВЛЕНО: Додано час до дати створення
         created_str = self.goal.created_at.strftime('%d.%m.%Y %H:%M')
         info.addWidget(QLabel(f"Створено: {created_str}", styleSheet="font-size: 11px; color: #666; margin-left: 5px;"))
 
         info.addStretch()
 
         date_col = "#e74c3c" if self.goal.is_overdue() else "#bdc3c7"
-        # Формат дати дедлайну вже був виправлений на День.Місяць.Рік Години:Хвилини
         info.addWidget(QLabel(f"⏳ {self.goal.deadline.strftime('%d.%m.%Y %H:%M')}",
                               styleSheet=f"font-size: 12px; color: {date_col}; font-weight: bold;"))
         layout.addLayout(info)
@@ -172,7 +190,7 @@ class HabitCard(QFrame):
         self.goal = goal
         self.simulated_now = simulated_now
         self.on_edit = on_edit
-        self.on_delete = on_delete  # Новий колбек
+        self.on_delete = on_delete
         self.setup_ui(on_start, on_finish)
 
     def setup_ui(self, on_start, on_finish):
@@ -205,7 +223,7 @@ class HabitCard(QFrame):
         header.addWidget(lbl_title)
         header.addStretch()
 
-        # Кнопка редагування (Жовта, текстом)
+        # Кнопка редагування
         btn_edit = QPushButton("✏️ Редагувати")
         btn_edit.setCursor(Qt.PointingHandCursor)
         btn_edit.setStyleSheet("""
@@ -222,7 +240,7 @@ class HabitCard(QFrame):
         btn_edit.clicked.connect(lambda: self.on_edit(self.goal))
         header.addWidget(btn_edit)
 
-        # Кнопка видалення (червоний хрестик)
+        # Кнопка видалення
         btn_del = QPushButton("✕")
         btn_del.setCursor(Qt.PointingHandCursor)
         btn_del.setFixedSize(24, 24)
