@@ -45,7 +45,7 @@ class BaseTab(QWidget):
         BTN_REFRESH_HEIGHT = 36
         BTN_REFRESH_WIDTH = 50
         COMBO_SORT_HEIGHT = 36
-        COMBO_SORT_WIDTH = 220
+        COMBO_SORT_WIDTH = 250
         BTN_SEARCH_WIDTH = 100
         BTN_CLEANUP_HEIGHT = 36
         BTN_CLEANUP_WIDTH = 160
@@ -112,32 +112,7 @@ class BaseTab(QWidget):
             sort_combo = QComboBox()
             sort_combo.addItems(sort_items)
             sort_combo.setFixedSize(COMBO_SORT_WIDTH, COMBO_SORT_HEIGHT)
-            sort_combo.setStyleSheet("""
-                QComboBox { 
-                    padding-left: 10px;
-                    border: 1px solid #555; 
-                    background-color: #333; 
-                    color: white;
-                    border-radius: 5px;
-                    font-weight: bold;
-                    font-size: 13px;
-                }
-                QComboBox::drop-down { border: none; }
-                QComboBox::down-arrow { 
-                    image: none; 
-                    border-left: 2px solid #aaa; 
-                    border-bottom: 2px solid #aaa; 
-                    width: 8px; height: 8px; 
-                    margin-right: 12px; 
-                    transform: rotate(-45deg); 
-                }
-                QComboBox QAbstractItemView {
-                    background-color: #333;
-                    color: white;
-                    selection-background-color: #555;
-                    border: 1px solid #555;
-                }
-            """)
+
             if on_sort_change:
                 sort_combo.currentIndexChanged.connect(on_sort_change)
             box.addWidget(sort_combo)
